@@ -1,0 +1,121 @@
+/* Genel Ayarlar */
+body {
+    font-family: 'Roboto', sans-serif;
+    background-color: #F4F5F7;
+    color: #1E293B;
+    margin: 0;
+    padding: 0;
+    line-height: 1.6;
+}
+
+h1, h2 {
+    color: #007BFF;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+
+a {
+    text-decoration: none;
+    color: #007BFF;
+}
+
+a:hover {
+    color: #0056b3;
+}
+
+/* Navbar */
+.navbar {
+    background-color: #007BFF;
+    padding: 15px 20px;
+    border-bottom: 3px solid #0056b3;
+}
+
+.navbar-brand, .nav-link {
+    color: #FFFFFF !important;
+    font-weight: bold;
+}
+
+.nav-link:hover {
+    color: #DDEEFF !important;
+}
+
+/* Card ve Tablo */
+.card {
+    border: none;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    background-color: #FFFFFF;
+    margin-bottom: 20px;
+}
+
+.table {
+    background-color: #FFFFFF;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-top: 20px;
+    width: 100%;
+    text-align: left;
+}
+
+.table th, .table td {
+    padding: 10px 15px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.table th {
+    background-color: #F1F5F9;
+    color: #1E293B;
+    font-weight: 600;
+}
+
+/* Butonlar */
+.btn {
+    background-color: #007BFF;
+    border: none;
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s ease;
+}
+
+.btn:hover {
+    background-color: #0056b3;
+}
+
+.btn-success {
+    background-color: #22C55E;
+}
+
+.btn-success:hover {
+    background-color: #16A34A;
+}
+
+.btn-danger {
+    background-color: #EF4444;
+}
+
+.btn-danger:hover {
+    background-color: #DC2626;
+}
+
+/* Form Elemanları */
+input[type="text"], input[type="number"] {
+    width: 100%;
+    padding: 12px;
+    margin: 10px 0;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    box-sizing: border-box;
+    font-size: 14px;
+    background-color: #F9FAFB;
+    color: #1E293B;
+}
+
+input[type="text"]:focus, input[type="number"]:focus {
+    outline: none;
+    border: 1px solid #007BFF;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.2);
+}
