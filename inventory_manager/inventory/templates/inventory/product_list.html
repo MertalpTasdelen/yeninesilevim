@@ -1,32 +1,26 @@
 {% extends 'base.html' %}
 
-{% block title %}Product List{% endblock %}
-
 {% block content %}
-<div class="card">
-    <h2>Product List</h2>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Price</th>
-                <th>Stock</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td>{{ product.name }}</td>
-                <td>{{ product.price }}</td>
-                <td>{{ product.stock }}</td>
-                <td>
-                    <a href="{% url 'adjust_stock' product.id -1 %}" class="btn btn-danger btn-sm">-1</a>
-                    <a href="{% url 'adjust_stock' product.id 1 %}" class="btn btn-success btn-sm">+1</a>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+<div class="container mt-5">
+    <h2 class="mb-4">Product List</h2>
+    <form method="GET" action="{% url 'product_list' %}" class="mb-4">
+        <div class="input-group">
+            <input type="text" id="search-input" name="q" class="form-control" placeholder="Search products..." value="{{ query|default_if_none:'' }}">
+        </div>
+    </form>
+    <div id="product-list">
+        {% include 'inventory/product_list_results.html' %}
+    </div>
 </div>
+
+<script>
+document.getElementById('search-input').addEventListener('input', function() {
+    const query = this.value;
+    fetch(`{% url 'ajax_search' %}?q=${query}`)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('product-list').innerHTML = data.html;
+        });
+});
+</script>
 {% endblock %}

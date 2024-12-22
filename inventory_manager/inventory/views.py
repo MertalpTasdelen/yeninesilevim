@@ -1,11 +1,31 @@
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from .models import Product
 from .forms import ProductForm
-from django.http import HttpResponseBadRequest
+from django.http import JsonResponse
+from django.db.models import Q
+from django.template.loader import render_to_string
+from django.views.decorators.csrf import csrf_exempt
+
+def ajax_search(request):
+    query = request.GET.get('q')
+    if query:
+        products = Product.objects.filter(
+            Q(name__icontains=query) | Q(barcode__icontains=query)
+        ).order_by('id')
+    else:
+        products = Product.objects.all().order_by('id')
+    html = render_to_string('inventory/product_list_results.html', {'products': products})
+    return JsonResponse({'html': html})
 
 def product_list(request):
-    products = Product.objects.all()
-    return render(request, 'inventory/product_list.html', {'products': products})
+    query = request.GET.get('q')
+    if query:
+        products = Product.objects.filter(
+            Q(name__icontains=query) | Q(barcode__icontains=query)
+        ).order_by('id')
+    else:
+        products = Product.objects.all().order_by('id')
+    return render(request, 'inventory/product_list.html', {'products': products, 'query': query})
 
 def add_product(request):
     if request.method == 'POST':
@@ -15,22 +35,28 @@ def add_product(request):
             return redirect('product_list')
     else:
         form = ProductForm()
-    return render(request, 'inventory/add_product.html', {'form': form})
+    return render(request, 'inventory/product_form.html', {'form': form})
 
-def adjust_stock(request, product_id, amount):
-    try:
-        # Convert `amount` to an integer (handles negative values)
-        amount = int(amount)
-    except ValueError:
-        # Return a bad request if `amount` is not a valid integer
-        return HttpResponseBadRequest("Invalid amount value")
+def edit_product(request, id):
+    product = get_object_or_404(Product, id=id)
+    if request.method == 'POST':
+        form = ProductForm(request.POST, instance=product)
+        if form.is_valid():
+            form.save()
+            return redirect('product_list')
+    else:
+        form = ProductForm(instance=product)
+    return render(request, 'inventory/product_form.html', {'form': form})
 
-    # Get the product or return 404 if it doesn't exist
-    product = get_object_or_404(Product, id=product_id)
+def delete_product(request, id):
+    product = get_object_or_404(Product, id=id)
+    product.delete()
+    return redirect('product_list')
 
-    # Adjust stock
-    product.stock += amount
-    product.save()
-
-    # Redirect back to the product list
+@csrf_exempt
+def adjust_stock(request, id, amount):
+    product = get_object_or_404(Product, id=id)
+    if request.method == 'POST':
+        product.stock += int(amount)  # Convert amount to integer
+        product.save()
     return redirect('product_list')

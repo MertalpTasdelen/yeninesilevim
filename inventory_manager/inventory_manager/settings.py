@@ -48,6 +48,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware'
 ]
 
 ROOT_URLCONF = 'inventory_manager.urls'
@@ -62,7 +63,7 @@ TEMPLATES = [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+                'django.contrib.messages.context_processors.messages'
             ],
         },
     },
@@ -76,8 +77,12 @@ WSGI_APPLICATION = 'inventory_manager.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'inventory_db',  # Veritabanı adı
+        'USER': 'postgres',  # Kullanıcı adı
+        'PASSWORD': '102030',  # Şifre
+        'HOST': 'localhost',  # PostgreSQL sunucusu
+        'PORT': '5432',  # Varsayılan PostgreSQL portu
     }
 }
 
