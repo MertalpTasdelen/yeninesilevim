@@ -5,6 +5,7 @@ from django.http import JsonResponse
 from django.db.models import Q
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render
 
 def ajax_search(request):
     query = request.GET.get('q')
@@ -60,3 +61,6 @@ def adjust_stock(request, id, amount):
         product.stock += int(amount)  # Convert amount to integer
         product.save()
     return redirect('product_list')
+
+def camera_view(request):
+    return render(request, 'inventory/camera_view.html')
