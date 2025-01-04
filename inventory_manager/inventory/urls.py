@@ -9,5 +9,6 @@ urlpatterns = [
     path('product/edit/<int:id>/', views.edit_product, name='edit_product'),
     path('product/delete/<int:id>/', views.delete_product, name='delete_product'),
     path('camera/', views.camera_view, name='camera_view'),
+    path('scan-barcode/', views.scan_barcode, name='scan_barcode'),
     re_path(r'^product/adjust_stock/(?P<id>\d+)/(?P<amount>-?\d+)/$', views.adjust_stock, name='adjust_stock')
 ]

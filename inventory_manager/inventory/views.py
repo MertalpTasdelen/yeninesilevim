@@ -6,6 +6,11 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
+from pyzbar.pyzbar import decode
+from PIL import Image
+import base64
+from io import BytesIO
+
 
 def ajax_search(request):
     query = request.GET.get('q')
@@ -64,3 +69,23 @@ def adjust_stock(request, id, amount):
 
 def camera_view(request):
     return render(request, 'inventory/camera_view.html')
+
+def scan_barcode(request):
+    if request.method == 'POST':
+        try:
+            # Get the image data from the request
+            image_data = request.json().get('image')
+            image_data = image_data.split(",")[1]  # Remove the data:image/png;base64, prefix
+            image_bytes = BytesIO(base64.b64decode(image_data))
+            image = Image.open(image_bytes)
+
+            # Decode the barcode
+            decoded_objects = decode(image)
+            if decoded_objects:
+                barcode_data = decoded_objects[0].data.decode('utf-8')
+                return JsonResponse({'message': f'Barcode data: {barcode_data}'})
+            else:
+                return JsonResponse({'message': 'No barcode detected'})
+        except Exception as e:
+            return JsonResponse({'message': f'Error: {str(e)}'})
+    return JsonResponse({'message': 'Invalid request'})
