@@ -33,19 +33,32 @@ def ajax_search(request):
 
 def product_list(request):
     query = request.GET.get('q')
+    sort_by = request.GET.get('sort_by', 'id')
+    sort_order = request.GET.get('sort_order', 'asc')
+    
     if query:
         products = Product.objects.filter(
             Q(name__icontains=query) | Q(barcode__icontains=query)
-        ).order_by('id')
+        )
     else:
-        products = Product.objects.all().order_by('id')
+        products = Product.objects.all()
+    
+    if sort_order == 'desc':
+        sort_by = f'-{sort_by}'
+    
+    products = products.order_by(sort_by)
     
     # Pagination
     paginator = Paginator(products, 10)  # Show 10 products per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
-    return render(request, 'inventory/product_list.html', {'page_obj': page_obj, 'query': query})
+    return render(request, 'inventory/product_list.html', {
+        'page_obj': page_obj,
+        'query': query,
+        'sort_by': sort_by,
+        'sort_order': sort_order
+    })
 
 def add_product(request):
     if request.method == 'POST':
