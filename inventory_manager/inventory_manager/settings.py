@@ -78,7 +78,7 @@ WSGI_APPLICATION = 'inventory_manager.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'inventory_db',  # Veritabanı adı
+        'NAME': 'postgres',  # Veritabanı adı
         'USER': 'postgres',  # Kullanıcı adı
         'PASSWORD': '102030',  # Şifre
         'HOST': 'localhost',  # PostgreSQL sunucusu
