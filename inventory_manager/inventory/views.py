@@ -6,6 +6,8 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
+from django.core.paginator import Paginator
+
 from pyzbar.pyzbar import decode
 from PIL import Image
 import base64
@@ -20,7 +22,13 @@ def ajax_search(request):
         ).order_by('id')
     else:
         products = Product.objects.all().order_by('id')
-    html = render_to_string('inventory/product_list_results.html', {'products': products})
+    
+    # Pagination
+    paginator = Paginator(products, 10)  # Show 10 products per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    html = render_to_string('inventory/product_list_results.html', {'page_obj': page_obj, 'query': query})
     return JsonResponse({'html': html})
 
 def product_list(request):
@@ -31,7 +39,13 @@ def product_list(request):
         ).order_by('id')
     else:
         products = Product.objects.all().order_by('id')
-    return render(request, 'inventory/product_list.html', {'products': products, 'query': query})
+    
+    # Pagination
+    paginator = Paginator(products, 10)  # Show 10 products per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'inventory/product_list.html', {'page_obj': page_obj, 'query': query})
 
 def add_product(request):
     if request.method == 'POST':
