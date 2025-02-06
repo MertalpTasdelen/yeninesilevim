@@ -6,13 +6,14 @@ class Product(models.Model):
     purchase_price = models.DecimalField(max_digits=10, decimal_places=2)  # Alış fiyatı
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)  # Satış fiyatı
     stock = models.PositiveIntegerField()  # Stok adedi
+    image_url = models.CharField(max_length=1024, blank=True, null=True)  # Image URL
     created_at = models.DateTimeField(auto_now_add=True)  # Ürün eklenme zamanı
 
     def __str__(self):
         return self.name
 
     def profit_margin(self):
-        """Calculates porfit margin for the product"""
+        """Calculates profit margin for the product"""
         return self.selling_price - self.purchase_price
     
     class Meta:

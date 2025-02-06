@@ -2,6 +2,7 @@
     <thead>
         <tr>
             <th>#</th>
+            <th>Image</th>  <!-- New column for image -->
             <th>Name</th>
             <th>Barcode</th>
             <th>
@@ -47,6 +48,13 @@
         {% for product in page_obj %}
         <tr id="product-{{ product.id }}">
             <td>{{ product.id }}</td>
+            <td>
+                {% if product.image_url %}
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" style="width: 110px; height: 144px;">
+                {% else %}
+                    No Image
+                {% endif %}
+            </td>
             <td>{{ product.name }}</td>
             <td>{{ product.barcode }}</td>
             <td>${{ product.purchase_price }}</td>
@@ -70,7 +78,7 @@
         </tr>
         {% empty %}
         <tr>
-            <td colspan="7" class="text-center">No products available.</td>
+            <td colspan="8" class="text-center">No products available.</td>  <!-- Updated colspan -->
         </tr>
         {% endfor %}
     </tbody>

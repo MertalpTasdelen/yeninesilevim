@@ -5,7 +5,7 @@ file_path = "C:/Users/Taşdelen/Desktop/yeninesilevim/urunler.xlsx"  # Change th
 df = pd.read_excel(file_path)
 
 # Ensure your column names match
-df.columns = ["name", "barcode", "purchase_price", "selling_price", "stock"]
+df.columns = ["name", "barcode", "purchase_price", "selling_price", "stock", "image_url"]
 
 # Table name in the database
 table_name = "inventory_product"
@@ -18,9 +18,10 @@ for _, row in df.iterrows():
         row["barcode"], 
         row["purchase_price"], 
         row["selling_price"], 
-        row["stock"]
+        row["stock"],
+        row["image_url"]
     )
-    statement = f"INSERT INTO {table_name} (name, barcode, purchase_price, selling_price, stock) VALUES {values};"
+    statement = f"INSERT INTO {table_name} (name, barcode, purchase_price, selling_price, stock, image_url) VALUES {values};"
     insert_statements.append(statement)
 
 # Save to a .sql file
