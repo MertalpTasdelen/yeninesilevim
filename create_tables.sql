@@ -5,6 +5,7 @@ CREATE TABLE inventory_product (
     barcode VARCHAR(255) UNIQUE NOT NULL,
     purchase_price DECIMAL(10, 2) NOT NULL,
     selling_price DECIMAL(10, 2) NOT NULL,
+    commution DECIMAL(10, 2) NOT NULL,
     stock INTEGER NOT NULL,
     image_url VARCHAR(1024),  -- Increased length for image URL
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
