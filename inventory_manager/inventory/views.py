@@ -34,30 +34,38 @@ def ajax_search(request):
 def product_list(request):
     query = request.GET.get('q')
     sort_by = request.GET.get('sort_by', 'id')
-    sort_order = request.GET.get('sort_order', 'asc')
-    
+    page_number = request.GET.get('page', 1)
+
     if query:
         products = Product.objects.filter(
             Q(name__icontains=query) | Q(barcode__icontains=query)
         )
     else:
         products = Product.objects.all()
-    
-    if sort_order == 'desc':
-        sort_by = f'-{sort_by}'
-    
-    products = products.order_by(sort_by)
-    
+
+    if sort_by == 'stock_desc':
+        products = products.order_by('-stock')
+    elif sort_by == 'stock_asc':
+        products = products.order_by('stock')
+    elif sort_by == 'selling_price_desc':
+        products = products.order_by('-selling_price')
+    elif sort_by == 'selling_price_asc':
+        products = products.order_by('selling_price')
+    else:
+        products = products.order_by('id')
+
     # Pagination
     paginator = Paginator(products, 10)  # Show 10 products per page
-    page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        html = render_to_string('inventory/product_list_results.html', {'page_obj': page_obj})
+        return JsonResponse({'html': html, 'has_next': page_obj.has_next()})
+
     return render(request, 'inventory/product_list.html', {
         'page_obj': page_obj,
         'query': query,
-        'sort_by': sort_by,
-        'sort_order': sort_order
+        'sort_by': sort_by
     })
 
 def add_product(request):

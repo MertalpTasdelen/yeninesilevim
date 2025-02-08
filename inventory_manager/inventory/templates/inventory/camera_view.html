@@ -1,15 +1,13 @@
 {% extends 'base.html' %}
 
-{% block title %}QR Code Scanner{% endblock %}
-
 {% block content %}
 <div class="container mt-5">
-    <h1 class="text-center">QR Code Scanner</h1>
-    <div class="d-flex justify-content-center">
-        <!-- QR Code Reader Container -->
-        <div id="reader" style="width: 300px;"></div>
+    <h2 class="mb-4 text-center">QR Code Scanner</h2>
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div id="reader" style="width: 100%; height: auto;"></div>
+        </div>
     </div>
-    <div id="result" class="mt-3 text-center text-success font-weight-bold"></div>
 </div>
 
 <!-- Include html5-qrcode -->
@@ -20,8 +18,13 @@ window.onload = function () {
     function onScanSuccess(decodedText, decodedResult) {
         console.log(`QR Code detected: ${decodedText}`, decodedResult);
 
-        window.location.href = `{% url 'product_list' %}?q=${encodeURIComponent(decodedText)}`;
-
+        // Stop the QR code scanner
+        html5QrCode.stop().then(ignore => {
+            // Redirect to the product list with the scanned query
+            window.location.href = `{% url 'product_list' %}?q=${encodeURIComponent(decodedText)}`;
+        }).catch(err => {
+            console.error("Failed to stop QR Code scanning: ", err);
+        });
     }
 
     function onScanFailure(error) {
@@ -30,7 +33,7 @@ window.onload = function () {
 
     // Initialize the QR Code scanner
     const html5QrCode = new Html5Qrcode("reader");
-    const qrCodeScannerConfig = { fps: 10, qrbox: { width: 250, height: 250 } };
+    const qrCodeScannerConfig = { fps: 5, qrbox: { width: 250, height: 250 } };
 
     html5QrCode.start(
         { facingMode: "environment" },

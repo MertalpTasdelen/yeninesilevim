@@ -4,11 +4,23 @@
 <div class="container mt-5">
     <h2 class="mb-4">Product List</h2>
     <form method="GET" action="{% url 'product_list' %}" class="mb-4">
-        <div class="input-group">
-            <input type="text" id="search-input" name="q" class="form-control" placeholder="Search products..." value="{{ query|default_if_none:'' }}">
+        <div class="input-group mb-3">
+            <input type="text" id="search-input" name="q" class="form-control" placeholder="Ürün ara..." value="{{ query|default_if_none:'' }}" aria-label="Search products" aria-describedby="filter-icon">
+        </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text" id="filter-icon">
+                <i class="fas fa-filter"></i>
+            </span>
+            <select class="form-select" id="sort-by" name="sort_by" onchange="this.form.submit()">
+                <option value="" {% if not sort_by %}selected{% endif %}>Sıralama seçin</option>
+                <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stoğa göre azalan</option>
+                <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stoğa göre artan</option>
+                <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Satış fiyatına göre azalan</option>
+                <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Satış fiyatına göre artan</option>
+            </select>
         </div>
     </form>
-    <div id="product-list">
+    <div id="product-list" class="row">
         {% include 'inventory/product_list_results.html' %}
     </div>
 </div>
@@ -20,7 +32,6 @@ function getCookie(name) {
         const cookies = document.cookie.split(';');
         for (let i = 0; i < cookies.length; i++) {
             const cookie = cookies[i].trim();
-            // Does this cookie string begin with the name we want?
             if (cookie.substring(0, name.length + 1) === (name + '=')) {
                 cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                 break;
@@ -31,18 +42,46 @@ function getCookie(name) {
 }
 
 const csrftoken = getCookie('csrftoken');
+let page = 1;
+let loading = false;
+let hasNext = true;
 
 document.getElementById('search-input').addEventListener('input', function() {
     const query = this.value;
-    fetch(`{% url 'ajax_search' %}?q=${query}`, {
+    const sortBy = document.getElementById('sort-by').value;
+    fetch(`{% url 'product_list' %}?q=${query}&sort_by=${sortBy}`, {
         headers: {
-            'X-CSRFToken': csrftoken
+            'X-CSRFToken': csrftoken,
+            'X-Requested-With': 'XMLHttpRequest'
         }
     })
     .then(response => response.json())
     .then(data => {
         document.getElementById('product-list').innerHTML = data.html;
+        page = 1; // Reset page number for infinite scrolling
+        hasNext = data.has_next; // Update hasNext based on response
     });
+});
+
+window.addEventListener('scroll', () => {
+    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !loading && hasNext) {
+        loading = true;
+        page += 1;
+        const query = document.getElementById('search-input').value;
+        const sortBy = document.getElementById('sort-by').value;
+        fetch(`{% url 'product_list' %}?page=${page}&q=${query}&sort_by=${sortBy}`, {
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('product-list').insertAdjacentHTML('beforeend', data.html);
+            loading = false;
+            hasNext = data.has_next; // Update hasNext based on response
+        });
+    }
 });
 
 function confirmDelete(form) {
@@ -57,7 +96,7 @@ function confirmDelete(form) {
         })
         .then(response => {
             if (response.ok) {
-                form.closest('tr').remove();
+                form.closest('.product-item').remove();
             } else {
                 alert('Failed to delete the product.');
             }
