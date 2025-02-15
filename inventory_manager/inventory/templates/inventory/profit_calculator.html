@@ -7,12 +7,16 @@
     <h2 class="mb-4">Kâr Hesaplama</h2>
     <form id="profit-form">
         <div class="mb-3">
-            <label for="selling-price" class="form-label">Trendyol Satış Fiyatı</label>
-            <input type="number" class="form-control" id="selling-price" placeholder="Satış Fiyatı" required>
+            <label for="barcode" class="form-label">Barkod</label>
+            <input type="text" id="barcode" name="barcode" class="form-control" value="{{ barcode }}" readonly>
+        </div>
+        <div class="mb-3">
+            <label for="selling-price" class="form-label">Satış Fiyatı</label>
+            <input type="number" class="form-control" id="selling-price" placeholder="Satış Fiyatı" value="{{ selling_price }}" required>
         </div>
         <div class="mb-3">
             <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
-            <input type="number" class="form-control" id="commission-rate" placeholder="Komisyon Oranı" required>
+            <input type="number" class="form-control" id="commission-rate" placeholder="Komisyon Oranı" value="{{ commution }}" required>
         </div>
         <div class="mb-3">
             <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti</label>
