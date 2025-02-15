@@ -124,3 +124,14 @@ def scan_barcode(request):
         except Exception as e:
             return JsonResponse({'message': f'Error: {str(e)}'})
     return JsonResponse({'message': 'Invalid request'})
+
+def profit_calculator(request):
+    barcode = request.GET.get('barcode')
+    selling_price = request.GET.get('selling_price')
+    commution = request.GET.get('commution')
+    context = {
+        'barcode': barcode,
+        'selling_price': selling_price,
+        'commution': commution,
+    }
+    return render(request, 'inventory/profit_calculator.html', context)

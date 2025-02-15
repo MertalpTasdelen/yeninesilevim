@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+
+{% block title %}Kâr Hesaplama{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Kâr Hesaplama</h2>
+    <form id="profit-form">
+        <div class="mb-3">
+            <label for="barcode" class="form-label">Barkod</label>
+            <input type="text" id="barcode" name="barcode" class="form-control" value="{{ barcode }}" readonly>
+        </div>
+        <div class="mb-3">
+            <label for="selling-price" class="form-label">Satış Fiyatı</label>
+            <input type="number" class="form-control" id="selling-price" placeholder="Satış Fiyatı" value="{{ selling_price }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
+            <input type="number" class="form-control" id="commission-rate" placeholder="Komisyon Oranı" value="{{ commution }}" required>
+        </div>
+        <div class="mb-3">
+            <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti</label>
+            <input type="number" class="form-control" id="purchase-cost" placeholder="Maliyet" required>
+        </div>
+        <div class="mb-3">
+            <label for="shipping-cost" class="form-label">Kargo Maliyeti</label>
+            <input type="number" class="form-control" id="shipping-cost" placeholder="Kargo Maliyeti" required>
+        </div>
+        <div class="mb-3">
+            <label for="packaging-cost" class="form-label">Paketleme Maliyeti</label>
+            <input type="number" class="form-control" id="packaging-cost" placeholder="Paketleme Maliyeti" required>
+        </div>
+        <div class="mb-3">
+            <label for="other-costs" class="form-label">Diğer Maliyetler</label>
+            <input type="number" class="form-control" id="other-costs" placeholder="Diğer Maliyetler" required>
+        </div>
+        <div class="mb-3">
+            <label for="vat-rate" class="form-label">KDV Oranı (%)</label>
+            <input type="number" class="form-control" id="vat-rate" placeholder="KDV Oranı" required>
+        </div>
+
+        <button type="button" class="btn btn-success" onclick="calculateProfit()">Hesapla</button>
+        <button type="button" class="btn btn-secondary" onclick="clearForm()">Temizle</button>
+    </form>
+
+    <div class="mt-4">
+        <h4>Sonuçlar</h4>
+        <p>Ödediğiniz Komisyon: <span id="paid-commission">0</span> TL</p>
+        <p>Ödediğiniz KDV: <span id="paid-vat">0</span> TL</p>
+        <p>Toplam Maliyet: <span id="total-cost">0</span> TL</p>
+        <p>Net Kâr: <span id="net-profit">0</span> TL</p>
+        <p>Yüzde Kâr: <span id="profit-margin">0</span>%</p>
+    </div>
+</div>
+
+<script>
+function calculateProfit() {
+    // Kullanıcı girişlerini al
+    const sellingPrice = parseFloat(document.getElementById('selling-price').value);
+    const commissionRate = parseFloat(document.getElementById('commission-rate').value) / 100;
+    const purchaseCost = parseFloat(document.getElementById('purchase-cost').value);
+    const shippingCost = parseFloat(document.getElementById('shipping-cost').value);
+    const packagingCost = parseFloat(document.getElementById('packaging-cost').value);
+    const otherCosts = parseFloat(document.getElementById('other-costs').value);
+    const vatRate = parseFloat(document.getElementById('vat-rate').value) / 100;
+
+    // Ödediğiniz Komisyon
+    const paidCommission = sellingPrice * commissionRate;
+
+    // Toplam Maliyet
+    const totalCost = (purchaseCost + shippingCost + packagingCost + otherCosts + paidCommission);
+
+    // Ödediğiniz KDV
+    const paidVat = (sellingPrice * vatRate) - (totalCost * vatRate);
+
+    // Net Kâr
+    const netProfit = sellingPrice - totalCost - paidVat - commissionRate
+
+    // Yüzde Kâr
+    const profitMargin = (netProfit / totalCost) * 100;
+
+    // Sonuçları güncelle
+    document.getElementById('paid-commission').innerText = paidCommission.toFixed(2);
+    document.getElementById('paid-vat').innerText = paidVat.toFixed(2);
+    document.getElementById('total-cost').innerText = totalCost.toFixed(2);
+    document.getElementById('net-profit').innerText = netProfit.toFixed(2);
+    document.getElementById('profit-margin').innerText = profitMargin.toFixed(2);
+}
+
+function clearForm() {
+    document.getElementById('selling-price').value = '';
+    document.getElementById('commission-rate').value = '';
+    document.getElementById('purchase-cost').value = '';
+    document.getElementById('shipping-cost').value = '';
+    document.getElementById('packaging-cost').value = '';
+    document.getElementById('other-costs').value = '';
+    document.getElementById('vat-rate').value = '';
+
+    document.getElementById('paid-commission').innerText = '0';
+    document.getElementById('paid-vat').innerText = '0';
+    document.getElementById('total-cost').innerText = '0';
+    document.getElementById('net-profit').innerText = '0';
+    document.getElementById('profit-margin').innerText = '0';
+}
+</script>
+
+{% endblock %}

@@ -106,5 +106,9 @@ function confirmDelete(form) {
         return false;
     }
 }
+
+function calculatePrice(barcode, sellingPrice, commution) {
+    window.location.href = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
+}
 </script>
 {% endblock %}
