@@ -11,5 +11,8 @@ urlpatterns = [
     path('camera/', views.camera_view, name='camera_view'),
     path('scan-barcode/', views.scan_barcode, name='scan_barcode'),
     path('profit-calculator/', views.profit_calculator, name='profit_calculator'),
+    path('save_profit_calculation/', views.save_profit_calculation, name='save_profit_calculation'),
+    path('profit_calculator_list/', views.profit_calculator_list, name='profit_calculator_list'),
+    path('get_product_image/', views.get_product_image, name='get_product_image'),
     re_path(r'^product/adjust_stock/(?P<id>\d+)/(?P<amount>-?\d+)/$', views.adjust_stock, name='adjust_stock')
 ]
