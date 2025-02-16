@@ -5,50 +5,48 @@
 {% block content %}
 <div class="container mt-5">
     <h2 class="mb-4">Kâr Hesaplama Kayıtları</h2>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Barkod</th>
-                <th>Satış Fiyatı (TL)</th>
-                <th>Komisyon Oranı (%)</th>
-                <th>Alış Maliyeti (TL)</th>
-                <th>Kargo Maliyeti (TL)</th>
-                <th>Paketleme Maliyeti (TL)</th>
-                <th>Diğer Maliyetler (TL)</th>
-                <th>KDV Oranı (%)</th>
-                <th>Ödediğiniz Komisyon (TL)</th>
-                <th>Ödediğiniz KDV (TL)</th>
-                <th>Toplam Maliyet (TL)</th>
-                <th>Net Kâr (TL)</th>
-                <th>Yüzde Kâr (%)</th>
-                <th>Oluşturulma Tarihi</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for record in records %}
-            <tr>
-                <td class="barcode-cell" data-barcode="{{ record.barcode }}">{{ record.barcode }}</td>
-                <td>{{ record.selling_price }}</td>
-                <td>{{ record.commution }}</td>
-                <td>{{ record.purchase_cost }}</td>
-                <td>{{ record.shipping_cost }}</td>
-                <td>{{ record.packaging_cost }}</td>
-                <td>{{ record.other_costs }}</td>
-                <td>{{ record.vat_rate }}</td>
-                <td>{{ record.paid_commission }}</td>
-                <td>{{ record.paid_vat }}</td>
-                <td>{{ record.total_cost }}</td>
-                <td>{{ record.net_profit }}</td>
-                <td>{{ record.profit_margin }}</td>
-                <td>{{ record.created_at }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="14" class="text-center">Kayıt bulunamadı.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="table-responsive">
+        <table class="table table-bordered table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Barkod</th>
+                    <th>Satış Fiyatı (TL)</th>
+                    <th>Alış Fiyatı (TL)</th>
+                    <th>Net Kâr (TL)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in records %}
+                <tr class="expandable-row" data-barcode="{{ record.barcode }}">
+                    <td class="barcode-cell" data-barcode="{{ record.barcode }}">{{ record.barcode }}</td>
+                    <td>{{ record.selling_price }}</td>
+                    <td>{{ record.purchase_cost }}</td>
+                    <td>{{ record.net_profit }}</td>
+                </tr>
+                <tr class="expanded-content" style="display: none;">
+                    <td colspan="4">
+                        <div class="expanded-details">
+                            <p><strong>Satış Fiyatı (TL):</strong> {{ record.selling_price }}</p>
+                            <p><strong>Alış Maliyeti (TL):</strong> {{ record.purchase_cost }}</p>
+                            <p><strong>Kargo Maliyeti (TL):</strong> {{ record.shipping_cost }}</p>
+                            <p><strong>Paketleme Maliyeti (TL):</strong> {{ record.packaging_cost }}</p>
+                            <p><strong>Diğer Maliyetler (TL):</strong> {{ record.other_costs }}</p>
+                            <p><strong>KDV Oranı (%):</strong> {{ record.vat_rate }}</p>
+                            <p><strong>Ödediğiniz Komisyon (TL):</strong> {{ record.paid_commission }}</p>
+                            <p><strong>Ödediğiniz KDV (TL):</strong> {{ record.paid_vat }}</p>
+                            <p><strong>Toplam Maliyet (TL):</strong> {{ record.total_cost }}</p>
+                            <p><strong>Oluşturulma Tarihi:</strong> {{ record.created_at }}</p>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center">Kayıt bulunamadı.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
     <div id="product-image-container" style="display: none; position: absolute;">
         <img id="product-image" src="" alt="Product Image" style="max-width: 200px; max-height: 200px;">
     </div>
@@ -83,6 +81,20 @@ document.addEventListener('DOMContentLoaded', function() {
         cell.addEventListener('mouseout', function() {
             imageContainer.style.display = 'none';
             productImage.src = '';
+        });
+    });
+
+    const expandableRows = document.querySelectorAll('.expandable-row');
+    expandableRows.forEach(row => {
+        row.addEventListener('click', function() {
+            const expandedContent = this.nextElementSibling;
+            if (expandedContent.style.display === 'none' || expandedContent.style.display === '') {
+                expandedContent.style.display = 'table-row';
+                expandedContent.classList.add('expand-animation');
+            } else {
+                expandedContent.style.display = 'none';
+                expandedContent.classList.remove('expand-animation');
+            }
         });
     });
 });
