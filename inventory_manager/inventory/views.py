@@ -1,5 +1,5 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Product
+from .models import Product, ProfitCalculator
 from .forms import ProductForm
 from django.http import JsonResponse
 from django.db.models import Q
@@ -135,3 +135,55 @@ def profit_calculator(request):
         'commution': commution,
     }
     return render(request, 'inventory/profit_calculator.html', context)
+
+@csrf_exempt
+def save_profit_calculation(request):
+    if request.method == 'POST':
+        barcode = request.POST.get('barcode')
+        selling_price = request.POST.get('selling_price')
+        commution = request.POST.get('commution')
+        purchase_cost = request.POST.get('purchase_cost')
+        shipping_cost = request.POST.get('shipping_cost')
+        packaging_cost = request.POST.get('packaging_cost')
+        other_costs = request.POST.get('other_costs')
+        vat_rate = request.POST.get('vat_rate')
+
+        # Calculate the results
+        commission_rate = float(commution) / 100
+        paid_commission = float(selling_price) * commission_rate
+        total_cost = float(purchase_cost) + float(shipping_cost) + float(packaging_cost) + float(other_costs) + paid_commission
+        paid_vat = (float(selling_price) * float(vat_rate) / 100) - (total_cost * float(vat_rate) / 100)
+        net_profit = float(selling_price) - total_cost - paid_vat - commission_rate
+        profit_margin = (net_profit / total_cost) * 100
+
+        # product = get_object_or_404(Product, barcode=barcode)
+
+        # Save to the database
+        ProfitCalculator.objects.create(
+            barcode=barcode,
+            selling_price=selling_price,
+            commution=commution,
+            purchase_cost=purchase_cost,
+            shipping_cost=shipping_cost,
+            packaging_cost=packaging_cost,
+            other_costs=other_costs,
+            vat_rate=vat_rate,
+            paid_commission=paid_commission,
+            paid_vat=paid_vat,
+            total_cost=total_cost,
+            net_profit=net_profit,
+            profit_margin=profit_margin
+        )
+
+        return redirect('profit_calculator')
+
+    return render(request, 'inventory/profit_calculator.html')
+
+def profit_calculator_list(request):
+    records = ProfitCalculator.objects.all()
+    return render(request, 'inventory/profit_calculator_list.html', {'records': records})
+
+def get_product_image(request):
+    barcode = request.GET.get('barcode')
+    product = get_object_or_404(Product, barcode=barcode)
+    return JsonResponse({'image_url': product.image_url})

@@ -5,42 +5,44 @@
 {% block content %}
 <div class="container mt-5">
     <h2 class="mb-4">Kâr Hesaplama</h2>
-    <form id="profit-form">
+    <form id="profit-form" method="POST" action="{% url 'save_profit_calculation' %}">
+        {% csrf_token %}
         <div class="mb-3">
             <label for="barcode" class="form-label">Barkod</label>
             <input type="text" id="barcode" name="barcode" class="form-control" value="{{ barcode }}" readonly>
         </div>
         <div class="mb-3">
             <label for="selling-price" class="form-label">Satış Fiyatı</label>
-            <input type="number" class="form-control" id="selling-price" placeholder="Satış Fiyatı" value="{{ selling_price }}" required>
+            <input type="number" class="form-control" id="selling-price" name="selling_price" placeholder="Satış Fiyatı" value="{{ selling_price }}" required>
         </div>
         <div class="mb-3">
             <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
-            <input type="number" class="form-control" id="commission-rate" placeholder="Komisyon Oranı" value="{{ commution }}" required>
+            <input type="number" class="form-control" id="commission-rate" name="commution" placeholder="Komisyon Oranı" value="{{ commution }}" required>
         </div>
         <div class="mb-3">
             <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti</label>
-            <input type="number" class="form-control" id="purchase-cost" placeholder="Maliyet" required>
+            <input type="number" class="form-control" id="purchase-cost" name="purchase_cost" placeholder="Maliyet" required>
         </div>
         <div class="mb-3">
             <label for="shipping-cost" class="form-label">Kargo Maliyeti</label>
-            <input type="number" class="form-control" id="shipping-cost" placeholder="Kargo Maliyeti" required>
+            <input type="number" class="form-control" id="shipping-cost" name="shipping_cost" placeholder="Kargo Maliyeti" required>
         </div>
         <div class="mb-3">
             <label for="packaging-cost" class="form-label">Paketleme Maliyeti</label>
-            <input type="number" class="form-control" id="packaging-cost" placeholder="Paketleme Maliyeti" required>
+            <input type="number" class="form-control" id="packaging-cost" name="packaging_cost" placeholder="Paketleme Maliyeti" required>
         </div>
         <div class="mb-3">
             <label for="other-costs" class="form-label">Diğer Maliyetler</label>
-            <input type="number" class="form-control" id="other-costs" placeholder="Diğer Maliyetler" required>
+            <input type="number" class="form-control" id="other-costs" name="other_costs" placeholder="Diğer Maliyetler" required>
         </div>
         <div class="mb-3">
             <label for="vat-rate" class="form-label">KDV Oranı (%)</label>
-            <input type="number" class="form-control" id="vat-rate" placeholder="KDV Oranı" required>
+            <input type="number" class="form-control" id="vat-rate" name="vat_rate" placeholder="KDV Oranı" required>
         </div>
 
         <button type="button" class="btn btn-success" onclick="calculateProfit()">Hesapla</button>
         <button type="button" class="btn btn-secondary" onclick="clearForm()">Temizle</button>
+        <button type="submit" class="btn btn-primary">Ekle</button>
     </form>
 
     <div class="mt-4">
@@ -52,6 +54,7 @@
         <p>Yüzde Kâr: <span id="profit-margin">0</span>%</p>
     </div>
 </div>
+
 
 <script>
 function calculateProfit() {

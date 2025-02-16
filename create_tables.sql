@@ -28,7 +28,7 @@ FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
 -- Create the profit_calculator table
-CREATE TABLE profit_calculator (
+CREATE TABLE profits (
     id SERIAL PRIMARY KEY,
     barcode VARCHAR(50) REFERENCES inventory_product(barcode) ON DELETE CASCADE,
     selling_price DECIMAL(10, 2) NOT NULL,
@@ -58,6 +58,6 @@ $$ LANGUAGE plpgsql;
 
 -- Create the trigger to update the updated_at column on update
 CREATE TRIGGER update_profit_calculator_updated_at
-BEFORE UPDATE ON profit_calculator
+BEFORE UPDATE ON profits
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();

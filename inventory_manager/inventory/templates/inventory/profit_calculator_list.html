@@ -1,0 +1,90 @@
+{% extends 'base.html' %}
+
+{% block title %}Kâr Hesaplama Kayıtları{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Kâr Hesaplama Kayıtları</h2>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Barkod</th>
+                <th>Satış Fiyatı (TL)</th>
+                <th>Komisyon Oranı (%)</th>
+                <th>Alış Maliyeti (TL)</th>
+                <th>Kargo Maliyeti (TL)</th>
+                <th>Paketleme Maliyeti (TL)</th>
+                <th>Diğer Maliyetler (TL)</th>
+                <th>KDV Oranı (%)</th>
+                <th>Ödediğiniz Komisyon (TL)</th>
+                <th>Ödediğiniz KDV (TL)</th>
+                <th>Toplam Maliyet (TL)</th>
+                <th>Net Kâr (TL)</th>
+                <th>Yüzde Kâr (%)</th>
+                <th>Oluşturulma Tarihi</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for record in records %}
+            <tr>
+                <td class="barcode-cell" data-barcode="{{ record.barcode }}">{{ record.barcode }}</td>
+                <td>{{ record.selling_price }}</td>
+                <td>{{ record.commution }}</td>
+                <td>{{ record.purchase_cost }}</td>
+                <td>{{ record.shipping_cost }}</td>
+                <td>{{ record.packaging_cost }}</td>
+                <td>{{ record.other_costs }}</td>
+                <td>{{ record.vat_rate }}</td>
+                <td>{{ record.paid_commission }}</td>
+                <td>{{ record.paid_vat }}</td>
+                <td>{{ record.total_cost }}</td>
+                <td>{{ record.net_profit }}</td>
+                <td>{{ record.profit_margin }}</td>
+                <td>{{ record.created_at }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="14" class="text-center">Kayıt bulunamadı.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <div id="product-image-container" style="display: none; position: absolute;">
+        <img id="product-image" src="" alt="Product Image" style="max-width: 200px; max-height: 200px;">
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const barcodeCells = document.querySelectorAll('.barcode-cell');
+    const imageContainer = document.getElementById('product-image-container');
+    const productImage = document.getElementById('product-image');
+
+    barcodeCells.forEach(cell => {
+        cell.addEventListener('mouseover', function(event) {
+            const barcode = event.target.dataset.barcode;
+            fetch(`/get_product_image/?barcode=${barcode}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.image_url) {
+                        productImage.src = data.image_url;
+                        imageContainer.style.display = 'block';
+                        imageContainer.style.top = `${event.pageY + 10}px`;
+                        imageContainer.style.left = `${event.pageX + 10}px`;
+                    }
+                });
+        });
+
+        cell.addEventListener('mousemove', function(event) {
+            imageContainer.style.top = `${event.pageY + 10}px`;
+            imageContainer.style.left = `${event.pageX + 10}px`;
+        });
+
+        cell.addEventListener('mouseout', function() {
+            imageContainer.style.display = 'none';
+            productImage.src = '';
+        });
+    });
+});
+</script>
+{% endblock %}
