@@ -13,6 +13,7 @@
                     <th>Satış Fiyatı (TL)</th>
                     <th>Alış Fiyatı (TL)</th>
                     <th>Net Kâr (TL)</th>
+                    <th>İşlemler</th>
                 </tr>
             </thead>
             <tbody>
@@ -22,9 +23,12 @@
                     <td>{{ record.selling_price }}</td>
                     <td>{{ record.purchase_cost }}</td>
                     <td>{{ record.net_profit }}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm delete-button" data-id="{{ record.id }}">Sil</button>
+                    </td>
                 </tr>
                 <tr class="expanded-content" style="display: none;">
-                    <td colspan="4">
+                    <td colspan="5">
                         <div class="expanded-details">
                             <p><strong>Satış Fiyatı (TL):</strong> {{ record.selling_price }}</p>
                             <p><strong>Alış Maliyeti (TL):</strong> {{ record.purchase_cost }}</p>
@@ -41,7 +45,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center">Kayıt bulunamadı.</td>
+                    <td colspan="5" class="text-center">Kayıt bulunamadı.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -94,6 +98,29 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 expandedContent.style.display = 'none';
                 expandedContent.classList.remove('expand-animation');
+            }
+        });
+    });
+
+    const deleteButtons = document.querySelectorAll('.delete-button');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function(event) {
+            if (confirm('Bu kaydı silmek istediğinizden emin misiniz?')) {
+                const recordId = this.dataset.id;
+                fetch(`/delete_profit_calculation/${recordId}/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    },
+                })
+                .then(response => {
+                    if (response.ok) {
+                        this.closest('tr').nextElementSibling.remove(); // Remove expanded content row
+                        this.closest('tr').remove(); // Remove main row
+                    } else {
+                        alert('Kayıt silinemedi.');
+                    }
+                });
             }
         });
     });

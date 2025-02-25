@@ -14,5 +14,6 @@ urlpatterns = [
     path('save_profit_calculation/', views.save_profit_calculation, name='save_profit_calculation'),
     path('profit_calculator_list/', views.profit_calculator_list, name='profit_calculator_list'),
     path('get_product_image/', views.get_product_image, name='get_product_image'),
+    path('delete_profit_calculation/<int:id>/', views.delete_profit_calculation, name='delete_profit_calculation'),
     re_path(r'^product/adjust_stock/(?P<id>\d+)/(?P<amount>-?\d+)/$', views.adjust_stock, name='adjust_stock')
 ]

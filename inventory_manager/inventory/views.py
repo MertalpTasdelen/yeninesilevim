@@ -187,3 +187,10 @@ def get_product_image(request):
     barcode = request.GET.get('barcode')
     product = get_object_or_404(Product, barcode=barcode)
     return JsonResponse({'image_url': product.image_url})
+
+def delete_profit_calculation(request, id):
+    if request.method == 'DELETE':
+        record = get_object_or_404(ProfitCalculator, id=id)
+        record.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
