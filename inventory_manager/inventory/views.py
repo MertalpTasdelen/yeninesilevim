@@ -194,3 +194,20 @@ def delete_profit_calculation(request, id):
         record.delete()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
+
+def login_view(request):
+    LOGIN_PASSWORD = '12345'
+
+    if request.method == 'POST':
+        password = request.POST.get('password')
+        if password == LOGIN_PASSWORD:
+            request.session['is_logged_in'] = True
+            return redirect('product_list')  # Redirect to the profit_calculator_list page
+        else:
+            return render(request, 'inventory/login.html', {'error': 'Invalid password'})
+    return render(request, 'inventory/login.html')
+
+def logout_view(request):
+    if 'is_logged_in' in request.session:
+        del request.session['is_logged_in']
+    return redirect('product_list')

@@ -24,7 +24,11 @@
                     <td>{{ record.purchase_cost }}</td>
                     <td>{{ record.net_profit }}</td>
                     <td>
-                        <button class="btn btn-danger btn-sm delete-button" data-id="{{ record.id }}">Sil</button>
+                        {% if request.session.is_logged_in %}
+                            <button class="btn btn-danger btn-sm delete-button" data-id="{{ record.id }}">Sil</button>
+                        {% else %}
+                            <button class="btn btn-danger btn-sm delete-button disabled" data-id="{{ record.id }}">Sil</button>
+                        {% endif %}
                     </td>
                 </tr>
                 <tr class="expanded-content" style="display: none;">

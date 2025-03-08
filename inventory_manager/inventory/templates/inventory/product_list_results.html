@@ -19,11 +19,16 @@
                     <p class="card-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></p>
                     <div class="btn-group" role="group">
                         <button type="button" class="btn btn-info btn-sm me-2" onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}')">Kâr Hesapla</button>
-                        <a href="{% url 'edit_product' product.id %}" class="btn btn-warning btn-sm me-2">Düzenle</a>
-                        <form method="post" action="{% url 'delete_product' product.id %}" style="display:inline;" onsubmit="return confirmDelete(this);">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-secondary btn-sm">Sil</button>
-                        </form>
+                        {% if request.session.is_logged_in %}
+                            <a href="{% url 'edit_product' product.id %}" class="btn btn-warning btn-sm me-2">Düzenle</a>
+                            <form method="post" action="{% url 'delete_product' product.id %}" style="display:inline;" onsubmit="return confirmDelete(this);">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-secondary btn-sm">Sil</button>
+                            </form>
+                        {% else %}
+                            <a href="#" class="btn btn-warning btn-sm me-2 disabled">Düzenle</a>
+                            <button type="button" class="btn btn-secondary btn-sm disabled">Sil</button>
+                        {% endif %}
                     </div>
                 </div>
             </div>
