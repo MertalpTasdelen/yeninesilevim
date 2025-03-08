@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -30,13 +30,13 @@
                 {% if request.session.is_logged_in %}
                     <form class="d-flex me-auto" method="POST" action="{% url 'logout' %}">
                         {% csrf_token %}
-                        <button class="btn btn-outline-danger" type="submit">Logout</button>
+                        <button class="btn btn-outline-danger" type="submit">Çıkış Yap</button>
                     </form>
                 {% else %}
                     <form class="d-flex me-auto" method="POST" action="{% url 'login' %}">
                         {% csrf_token %}
-                        <input class="form-control me-2" type="password" name="password" placeholder="Password" required>
-                        <button class="btn btn-outline-success" type="submit">Login</button>
+                        <input class="form-control me-2" type="password" name="password" placeholder="Şifre" required>
+                        <button class="btn btn-outline-success" type="submit">Giriş Yap</button>
                     </form>
                 {% endif %}
                 <ul class="navbar-nav ms-auto">
@@ -44,7 +44,7 @@
                         <a class="nav-link" href="{% url 'product_list' %}">Ürünler</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'add_product' %}">Ürün Ekle</a>
+                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" href="{% url 'add_product' %}">Ürün Ekle</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'camera_view' %}">
@@ -71,7 +71,7 @@
 
     <!-- Footer -->
     <footer class="bg-dark text-white text-center py-3 mt-4">
-        <p>&copy; 2024 Inventory Manager | All Rights Reserved</p>
+        <p>&copy; 2024 Inventory Manager | Tüm Hakları Saklıdır</p>
     </footer>
 
     <!-- Bootstrap JS -->

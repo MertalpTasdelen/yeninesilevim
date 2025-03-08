@@ -2,11 +2,11 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4">{{ form.instance.id|yesno:"Edit Product,Add New Product" }}</h2>
+    <h2 class="mb-4">{{ form.instance.id|yesno:"Ürünü Düzenle,Yeni Ürün Ekle" }}</h2>
     <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Save</button>
+        <button type="submit" class="btn btn-primary">Kaydet</button>
     </form>
 </div>
 {% endblock %}
