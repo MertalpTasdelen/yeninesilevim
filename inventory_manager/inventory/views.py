@@ -15,21 +15,23 @@ from io import BytesIO
 
 
 def ajax_search(request):
-    query = request.GET.get('q')
-    if query:
-        products = Product.objects.filter(
-            Q(name__icontains=query) | Q(barcode__icontains=query)
-        ).order_by('id')
-    else:
-        products = Product.objects.all().order_by('id')
+    products = Product.objects.all()
+    page = request.GET.get('page', 1)
+    paginator = Paginator(products, 12)  # Her sayfada 12 ürün
     
-    # Pagination
-    paginator = Paginator(products, 10)  # Show 10 products per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
+    try:
+        products = paginator.page(page)
+    except PageNotAnInteger:
+        products = paginator.page(1)
+    except EmptyPage:
+        products = paginator.page(paginator.num_pages)
     
-    html = render_to_string('inventory/product_list_results.html', {'page_obj': page_obj, 'query': query})
-    return JsonResponse({'html': html})
+    context = {
+        'page_obj': products,
+        'request': request,  # Login durumunu kontrol etmek için request'i context'e ekleyin
+    }
+    
+    return render(request, 'inventory/product_list_results.html', context)
 
 def product_list(request):
     query = request.GET.get('q')
