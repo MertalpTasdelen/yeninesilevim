@@ -2,48 +2,72 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h2 class="mb-4 text-center">QR Code Scanner</h2>
+    <h2 class="mb-4 text-center">Barcode Scanner</h2>
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div id="reader" style="width: 100%; height: auto;"></div>
+            <!-- The element where the camera feed will be rendered -->
+            <div id="barcode-reader" style="width: 100%; height: auto;"></div>
         </div>
     </div>
 </div>
 
-<!-- Include html5-qrcode -->
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode/minified/html5-qrcode.min.js" defer></script>
+<!-- Include QuaggaJS from CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
 
 <script>
-window.onload = function () {
-    function onScanSuccess(decodedText, decodedResult) {
-        console.log(`QR Code detected: ${decodedText}`, decodedResult);
+// Initialize the barcode scanner when the DOM is ready
+document.addEventListener('DOMContentLoaded', function () {
+    // Callback when a barcode is successfully detected
+    function onDetected(result) {
+        const code = result.codeResult.code;
+        console.log(`Barcode detected: ${code}`, result);
 
-        // Stop the QR code scanner
-        html5QrCode.stop().then(ignore => {
-            // Redirect to the product list with the scanned query
-            window.location.href = `{% url 'product_list' %}?q=${encodeURIComponent(decodedText)}`;
-        }).catch(err => {
-            console.error("Failed to stop QR Code scanning: ", err);
-        });
+        // Stop the scanner to avoid multiple detections
+        Quagga.stop();
+
+        // Redirect to the product list with the scanned query
+        window.location.href = `{% url 'product_list' %}?q=${encodeURIComponent(code)}`;
     }
 
-    function onScanFailure(error) {
-        console.warn(`QR Code scanning failed: ${error}`);
-    }
+    // Configure and start the QuaggaJS scanner
+    Quagga.init({
+        inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: document.getElementById('barcode-reader'),
+            constraints: {
+                facingMode: "environment"
+            }
+        },
+        decoder: {
+            // Support common 1D barcode formats
+            readers: [
+                "code_128_reader",
+                "ean_reader",
+                "ean_8_reader",
+                "code_39_reader",
+                "code_39_vin_reader",
+                "codabar_reader",
+                "upc_reader",
+                "upc_e_reader",
+                "i2of5_reader",
+                "2of5_reader",
+                "code_93_reader"
+            ]
+        },
+        locate: true
+    }, function (err) {
+        if (err) {
+            console.error("Failed to initialize barcode scanner: ", err);
+            return;
+        }
 
-    // Initialize the QR Code scanner
-    const html5QrCode = new Html5Qrcode("reader");
-    const qrCodeScannerConfig = { fps: 5, qrbox: { width: 250, height: 250 } };
-
-    html5QrCode.start(
-        { facingMode: "environment" },
-        qrCodeScannerConfig,
-        onScanSuccess,
-        onScanFailure
-    ).catch(err => {
-        console.error("QR Code scanning error: ", err);
+        // Start the scanner
+        Quagga.start();
     });
-};
-</script>
 
+    // Listen for successful detections
+    Quagga.onDetected(onDetected);
+});
+</script>
 {% endblock %}
