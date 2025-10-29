@@ -1,7 +1,7 @@
 import pandas as pd
 
 # Load the Excel file
-file_path = "C:/Users/Taşdelen/Desktop/yeninesilevim/urunler.xlsx"  # Change this to your file's path
+file_path = "C:/Users/Taşdelen/Downloads/Aktif_ürünler.xlsx"  # Change this to your file's path
 df = pd.read_excel(file_path)
 
 # Ensure your column names match
