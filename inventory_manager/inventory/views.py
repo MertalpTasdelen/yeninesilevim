@@ -40,7 +40,9 @@ def product_list(request):
 
     if query:
         products = Product.objects.filter(
-            Q(name__icontains=query) | Q(barcode__icontains=query)
+            Q(name__icontains=query) | 
+            Q(barcode__icontains=query) |
+            Q(purchase_barcode__icontains=query)  # Yeni eklenen alan
         )
     else:
         products = Product.objects.all()

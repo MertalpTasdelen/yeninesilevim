@@ -5,7 +5,9 @@
     <h2 class="mb-4">Ürün Listesi</h2>
     <form method="GET" action="{% url 'product_list' %}" class="mb-4">
         <div class="input-group mb-3">
-            <input type="text" id="search-input" name="q" class="form-control" placeholder="Ürün ara..." value="{{ query|default_if_none:'' }}" aria-label="Search products" aria-describedby="filter-icon">
+            <input type="text" id="search-input" name="q" class="form-control"
+                placeholder="Ürün adı, barkod veya alış barkodu ile ara..." value="{{ query|default_if_none:'' }}"
+                aria-label="Search products" aria-describedby="filter-icon">
         </div>
         <div class="input-group mb-3">
             <span class="input-group-text" id="filter-icon">
@@ -15,8 +17,10 @@
                 <option value="" {% if not sort_by %}selected{% endif %}>Sıralama seçin</option>
                 <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stoğa göre azalan</option>
                 <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stoğa göre artan</option>
-                <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Satış fiyatına göre azalan</option>
-                <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Satış fiyatına göre artan</option>
+                <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Satış
+                    fiyatına göre azalan</option>
+                <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Satış
+                    fiyatına göre artan</option>
             </select>
         </div>
     </form>
@@ -27,38 +31,39 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
-function getCookie(name) {
-    let cookieValue = null;
-    if (document.cookie && document.cookie !== '') {
-        const cookies = document.cookie.split(';');
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                break;
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
             }
         }
+        return cookieValue;
     }
-    return cookieValue;
-}
 
-const csrftoken = getCookie('csrftoken');
-let page = 1;
-let loading = false;
-let hasNext = true;
+    const csrftoken = getCookie('csrftoken');
+    let page = 1;
+    let loading = false;
+    let hasNext = true;
 
-document.addEventListener('DOMContentLoaded', function() {
-    // İlk yüklemede butonları kontrol et
-    checkAuthButtons();
-
-    // AJAX ile sayfa yüklendiğinde butonları kontrol et
-    $(document).ajaxComplete(function() {
+    document.addEventListener('DOMContentLoaded', function () {
+        // İlk yüklemede butonları kontrol et
         checkAuthButtons();
-    });
-});
 
-function checkAuthButtons() {
-    const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
+        // AJAX ile sayfa yüklendiğinde butonları kontrol et
+        $(document).ajaxComplete(function () {
+            checkAuthButtons();
+        });
+    });
+
+    function checkAuthButtons() {
+        const isLoggedIn = {{ request.session.is_logged_in| yesno: "true,false"
+    }};
     const editButtons = document.querySelectorAll('.edit-button');
     const deleteButtons = document.querySelectorAll('.delete-button');
 
@@ -83,88 +88,88 @@ function checkAuthButtons() {
     });
 }
 
-// Pagination için AJAX
-$(document).on('click', '.pagination a', function(e) {
-    e.preventDefault();
-    var page = $(this).attr('href').split('page=')[1];
-    fetch_data(page);
-});
-
-function fetch_data(page) {
-    $.ajax({
-        url: "/ajax/search/?page=" + page,
-        success: function(data) {
-            $('#product-list').html(data);
-            checkAuthButtons(); // Yeni yüklenen içerik için butonları kontrol et
-        }
+    // Pagination için AJAX
+    $(document).on('click', '.pagination a', function (e) {
+        e.preventDefault();
+        var page = $(this).attr('href').split('page=')[1];
+        fetch_data(page);
     });
-}
 
-document.getElementById('search-input').addEventListener('input', function() {
-    const query = this.value;
-    const sortBy = document.getElementById('sort-by').value;
-    fetch(`{% url 'product_list' %}?q=${query}&sort_by=${sortBy}`, {
-        headers: {
-            'X-CSRFToken': csrftoken,
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('product-list').innerHTML = data.html;
-        page = 1; // Reset page number for infinite scrolling
-        hasNext = data.has_next; // Update hasNext based on response
-        checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
-    });
-});
+    function fetch_data(page) {
+        $.ajax({
+            url: "/ajax/search/?page=" + page,
+            success: function (data) {
+                $('#product-list').html(data);
+                checkAuthButtons(); // Yeni yüklenen içerik için butonları kontrol et
+            }
+        });
+    }
 
-window.addEventListener('scroll', () => {
-    if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !loading && hasNext) {
-        loading = true;
-        page += 1;
-        const query = document.getElementById('search-input').value;
+    document.getElementById('search-input').addEventListener('input', function () {
+        const query = this.value;
         const sortBy = document.getElementById('sort-by').value;
-        fetch(`{% url 'product_list' %}?page=${page}&q=${query}&sort_by=${sortBy}`, {
+        fetch(`{% url 'product_list' %}?q=${query}&sort_by=${sortBy}`, {
             headers: {
                 'X-CSRFToken': csrftoken,
                 'X-Requested-With': 'XMLHttpRequest'
             }
         })
-        .then(response => response.json())
-        .then(data => {
-            document.getElementById('product-list').insertAdjacentHTML('beforeend', data.html);
-            loading = false;
-            hasNext = data.has_next; // Update hasNext based on response
-            checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
-        });
-    }
-});
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('product-list').innerHTML = data.html;
+                page = 1; // Reset page number for infinite scrolling
+                hasNext = data.has_next; // Update hasNext based on response
+                checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
+            });
+    });
 
-function confirmDelete(form) {
-    if (confirm("Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.")) {
-        const formData = new FormData(form);
-        fetch(form.action, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'X-CSRFToken': csrftoken
-            }
-        })
-        .then(response => {
-            if (response.ok) {
-                form.closest('.product-item').remove();
-            } else {
-                alert('Ürün silinemedi.');
-            }
-        });
-        return false;
-    } else {
-        return false;
-    }
-}
+    window.addEventListener('scroll', () => {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500 && !loading && hasNext) {
+            loading = true;
+            page += 1;
+            const query = document.getElementById('search-input').value;
+            const sortBy = document.getElementById('sort-by').value;
+            fetch(`{% url 'product_list' %}?page=${page}&q=${query}&sort_by=${sortBy}`, {
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('product-list').insertAdjacentHTML('beforeend', data.html);
+                    loading = false;
+                    hasNext = data.has_next; // Update hasNext based on response
+                    checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
+                });
+        }
+    });
 
-function calculatePrice(barcode, sellingPrice, commution) {
-    window.location.href = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
-}
+    function confirmDelete(form) {
+        if (confirm("Bu ürünü silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.")) {
+            const formData = new FormData(form);
+            fetch(form.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': csrftoken
+                }
+            })
+                .then(response => {
+                    if (response.ok) {
+                        form.closest('.product-item').remove();
+                    } else {
+                        alert('Ürün silinemedi.');
+                    }
+                });
+            return false;
+        } else {
+            return false;
+        }
+    }
+
+    function calculatePrice(barcode, sellingPrice, commution) {
+        window.location.href = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
+    }
 </script>
 {% endblock %}
