@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from pyzbar.pyzbar import decode
 from PIL import Image
@@ -42,11 +42,12 @@ def product_list(request):
         products = Product.objects.filter(
             Q(name__icontains=query) | 
             Q(barcode__icontains=query) |
-            Q(purchase_barcode__icontains=query)  # Yeni eklenen alan
+            Q(purchase_barcode__icontains=query)
         )
     else:
         products = Product.objects.all()
 
+    # Sıralama işlemleri
     if sort_by == 'stock_desc':
         products = products.order_by('-stock')
     elif sort_by == 'stock_asc':
@@ -58,13 +59,18 @@ def product_list(request):
     else:
         products = products.order_by('id')
 
-    # Pagination
-    paginator = Paginator(products, 10)  # Show 10 products per page
+    paginator = Paginator(products, 12)  # Her sayfada 12 ürün
     page_obj = paginator.get_page(page_number)
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        html = render_to_string('inventory/product_list_results.html', {'page_obj': page_obj})
-        return JsonResponse({'html': html, 'has_next': page_obj.has_next()})
+        html = render_to_string(
+            'inventory/product_list_results.html',
+            {'page_obj': page_obj, 'request': request}
+        )
+        return JsonResponse({
+            'html': html,
+            'has_next': page_obj.has_next()
+        })
 
     return render(request, 'inventory/product_list.html', {
         'page_obj': page_obj,

@@ -62,31 +62,30 @@
     });
 
     function checkAuthButtons() {
-        const isLoggedIn = {{ request.session.is_logged_in| yesno: "true,false"
-    }};
-    const editButtons = document.querySelectorAll('.edit-button');
-    const deleteButtons = document.querySelectorAll('.delete-button');
+        const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
+        const editButtons = document.querySelectorAll('.edit-button');
+        const deleteButtons = document.querySelectorAll('.delete-button');
 
-    editButtons.forEach(button => {
-        if (!isLoggedIn) {
-            button.classList.add('disabled');
-            button.setAttribute('disabled', 'disabled');
-        } else {
-            button.classList.remove('disabled');
-            button.removeAttribute('disabled');
-        }
-    });
+        editButtons.forEach(button => {
+            if (!isLoggedIn) {
+                button.classList.add('disabled');
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.classList.remove('disabled');
+                button.removeAttribute('disabled');
+            }
+        });
 
-    deleteButtons.forEach(button => {
-        if (!isLoggedIn) {
-            button.classList.add('disabled');
-            button.setAttribute('disabled', 'disabled');
-        } else {
-            button.classList.remove('disabled');
-            button.removeAttribute('disabled');
-        }
-    });
-}
+        deleteButtons.forEach(button => {
+            if (!isLoggedIn) {
+                button.classList.add('disabled');
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.classList.remove('disabled');
+                button.removeAttribute('disabled');
+            }
+        });
+    }
 
     // Pagination için AJAX
     $(document).on('click', '.pagination a', function (e) {
