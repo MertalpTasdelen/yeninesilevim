@@ -1,73 +1,126 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4 text-center">Barcode Scanner</h2>
+<div class="container mt-5 text-center">
+    <h2 class="mb-4 fw-bold">📷 Barkod Tarayıcı</h2>
+
+    <div class="alert alert-info" role="alert" id="statusMessage">
+        Kameraya erişim izni vermeniz gerekiyor.
+    </div>
+
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <!-- The element where the camera feed will be rendered -->
-            <div id="barcode-reader" style="width: 100%; height: auto;"></div>
+            <div id="barcode-reader"
+                 style="width: 100%; aspect-ratio: 4 / 3; border: 3px solid #ccc; border-radius: 12px; overflow: hidden;">
+            </div>
         </div>
+    </div>
+
+    <div class="mt-4">
+        <button id="retryButton" class="btn btn-outline-secondary d-none">🔄 Yeniden Dene</button>
+        <button id="closeButton" class="btn btn-danger">Kapat</button>
     </div>
 </div>
 
-<!-- Include QuaggaJS from CDN -->
+<!-- QuaggaJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
 
 <script>
-// Initialize the barcode scanner when the DOM is ready
-document.addEventListener('DOMContentLoaded', function () {
-    // Callback when a barcode is successfully detected
-    function onDetected(result) {
-        const code = result.codeResult.code;
-        console.log(`Barcode detected: ${code}`, result);
+document.addEventListener("DOMContentLoaded", function () {
+    const statusMsg = document.getElementById("statusMessage");
+    const retryBtn = document.getElementById("retryButton");
+    const closeBtn = document.getElementById("closeButton");
 
-        // Stop the scanner to avoid multiple detections
-        Quagga.stop();
+    // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetField = urlParams.get("field") || "purchase_barcode";
 
-        // Redirect to the product list with the scanned query
-        window.location.href = `{% url 'product_list' %}?q=${encodeURIComponent(code)}`;
+    function updateStatus(message, type = "info") {
+        statusMsg.className = `alert alert-${type}`;
+        statusMsg.textContent = message;
     }
 
-    // Configure and start the QuaggaJS scanner
-    Quagga.init({
-        inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: document.getElementById('barcode-reader'),
-            constraints: {
-                facingMode: "environment"
-            }
-        },
-        decoder: {
-            // Support common 1D barcode formats
-            readers: [
-                "code_128_reader",
-                "ean_reader",
-                "ean_8_reader",
-                "code_39_reader",
-                "code_39_vin_reader",
-                "codabar_reader",
-                "upc_reader",
-                "upc_e_reader",
-                "i2of5_reader",
-                "2of5_reader",
-                "code_93_reader"
-            ]
-        },
-        locate: true
-    }, function (err) {
-        if (err) {
-            console.error("Failed to initialize barcode scanner: ", err);
+    function sendResultToParent(code) {
+        try {
+            window.opener.postMessage({ type: "barcode_scanned", value: code, field: targetField }, "*");
+            updateStatus(`Barkod okundu: ${code}`, "success");
+
+            // Birkaç saniye sonra otomatik kapanma
+            setTimeout(() => window.close(), 1500);
+        } catch (e) {
+            console.error("Mesaj gönderilemedi:", e);
+            updateStatus("Barkod başarıyla okundu ama form penceresine gönderilemedi.", "warning");
+        }
+    }
+
+    function initScanner() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
             return;
         }
 
-        // Start the scanner
-        Quagga.start();
+        updateStatus("Kamera başlatılıyor...");
+
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.getElementById("barcode-reader"),
+                constraints: {
+                    facingMode: "environment",
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            },
+            decoder: {
+                readers: [
+                    "code_128_reader",
+                    "ean_reader",
+                    "ean_8_reader",
+                    "code_39_reader",
+                    "codabar_reader",
+                    "upc_reader",
+                    "upc_e_reader",
+                    "i2of5_reader",
+                    "2of5_reader",
+                    "code_93_reader"
+                ]
+            },
+            locate: true
+        }, function (err) {
+            if (err) {
+                console.error("Quagga init error:", err);
+                updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
+                retryBtn.classList.remove("d-none");
+                return;
+            }
+            updateStatus("Kamera aktif. Barkodu okutun...");
+            Quagga.start();
+        });
+
+        Quagga.onDetected(result => {
+            const code = result?.codeResult?.code;
+            if (code) {
+                Quagga.stop();
+                updateStatus(`Barkod okundu: ${code}`, "success");
+                sendResultToParent(code);
+            }
+        });
+    }
+
+    retryBtn.addEventListener("click", () => {
+        retryBtn.classList.add("d-none");
+        initScanner();
     });
 
-    // Listen for successful detections
-    Quagga.onDetected(onDetected);
+    closeBtn.addEventListener("click", () => {
+        Quagga.stop();
+        window.close();
+    });
+
+    // Sayfa yüklenince tarayıcıyı başlat
+    initScanner();
 });
 </script>
 {% endblock %}

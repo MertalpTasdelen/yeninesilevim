@@ -4,10 +4,11 @@ from .models import Product
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ['name', 'barcode', 'purchase_price', 'selling_price', 'commution', 'stock', 'image_url']
+        fields = ['name', 'barcode', 'purchase_barcode', 'purchase_price', 'selling_price', 'commution', 'stock', 'image_url']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ürün adını girin'}),
             'barcode': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Barkodu girin'}),
+            'purchase_barcode': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Alış barkodunu girin'}),
             'purchase_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Alış fiyatını girin'}),
             'selling_price': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Satış fiyatını girin'}),
             'commution': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Komisyonu girin'}),
@@ -17,6 +18,7 @@ class ProductForm(forms.ModelForm):
         labels = {
             'name': 'Ürün Adı',
             'barcode': 'Barkod',
+            'purchase_barcode': 'Alış Barkodu',
             'purchase_price': 'Alış Fiyatı',
             'selling_price': 'Satış Fiyatı',
             'commution': 'Komisyon',

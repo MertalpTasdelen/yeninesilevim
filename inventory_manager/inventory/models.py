@@ -9,6 +9,14 @@ class Product(models.Model):
     stock = models.PositiveIntegerField()  # Stok adedi
     image_url = models.CharField(max_length=1024, blank=True, null=True)  # Image URL
     created_at = models.DateTimeField(auto_now_add=True)  # Ürün eklenme zamanı
+    purchase_barcode = models.CharField(
+        "Alış barkodu",
+        max_length=128,            # Barkod uzunluğunuza göre 64/128/255 seçebilirsiniz
+        blank=True,
+        null=True,
+        db_index=True,             # Arama/filtrelerde performans için endeks
+        help_text="Tedarikçinin/alış fişinin barkodu (opsiyonel)."
+    )
 
     def __str__(self):
         return self.name
