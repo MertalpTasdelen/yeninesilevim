@@ -6,6 +6,7 @@ from django.db.models import Q
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
+from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 from pyzbar.pyzbar import decode
@@ -65,7 +66,8 @@ def product_list(request):
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         html = render_to_string(
             'inventory/product_list_results.html',
-            {'page_obj': page_obj, 'request': request}
+            {'page_obj': page_obj, 'request': request},
+            request=request
         )
         return JsonResponse({
             'html': html,
@@ -99,17 +101,17 @@ def edit_product(request, id):
         form = ProductForm(instance=product)
     return render(request, 'inventory/product_form.html', {'form': form})
 
+@require_POST
 def delete_product(request, id):
     product = get_object_or_404(Product, id=id)
     product.delete()
     return redirect('product_list')
 
-@csrf_exempt
+@require_POST
 def adjust_stock(request, id, amount):
     product = get_object_or_404(Product, id=id)
-    if request.method == 'POST':
-        product.stock += int(amount)  # Convert amount to integer
-        product.save()
+    product.stock = max(product.stock + int(amount), 0)
+    product.save()
     return redirect('product_list')
 
 def camera_view(request):
@@ -206,7 +208,7 @@ def delete_profit_calculation(request, id):
     return JsonResponse({'success': False}, status=400)
 
 def login_view(request):
-    LOGIN_PASSWORD = '12345'
+    LOGIN_PASSWORD = '123456'
 
     if request.method == 'POST':
         password = request.POST.get('password')

@@ -55,6 +55,13 @@
 
         <button type="submit" class="btn btn-primary">Kaydet</button>
     </form>
+    {% if form.instance.id %}
+    <hr>
+    <form method="post" action="{% url 'delete_product' form.instance.id %}" onsubmit="return confirm('Bu ürünü silmek istediğinize emin misiniz?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Sil</button>
+    </form>
+    {% endif %}
 </div>
 
 <!-- ✅ Kamera entegrasyonu -->
