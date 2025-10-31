@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
     const urlParams = new URLSearchParams(window.location.search);
-    const targetField = urlParams.get("field") || "purchase_barcode";
+    const targetField = urlParams.get("field") || "product_search";
 
     function updateStatus(message, type = "info") {
         statusMsg.className = `alert alert-${type}`;
@@ -42,16 +42,38 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function sendResultToParent(code) {
-        try {
-            window.opener.postMessage({ type: "barcode_scanned", value: code, field: targetField }, "*");
-            updateStatus(`Barkod okundu: ${code}`, "success");
+        const payload = { type: "barcode_scanned", value: code, field: targetField };
+        let delivered = false;
 
-            // Birkaç saniye sonra otomatik kapanma
-            setTimeout(() => window.close(), 1500);
-        } catch (e) {
-            console.error("Mesaj gönderilemedi:", e);
-            updateStatus("Barkod başarıyla okundu ama form penceresine gönderilemedi.", "warning");
+        if (window.opener && !window.opener.closed) {
+            try {
+                window.opener.postMessage(payload, "*");
+                delivered = true;
+            } catch (e) {
+                console.error("Mesaj gönderilemedi:", e);
+            }
         }
+
+        if (!delivered) {
+            try {
+                localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
+                updateStatus("Barkod okundu. Ürün listesindeki arama kutusuna gönderiliyor...", "success");
+            } catch (storageError) {
+                console.error("Barkod localStorage'a yazılamadı:", storageError);
+                updateStatus("Barkod okundu ama sonuç kaydedilemedi.", "warning");
+            }
+        } else {
+            updateStatus(`Barkod okundu: ${code}`, "success");
+        }
+
+        // Birkaç saniye sonra otomatik kapanma
+        setTimeout(() => {
+            if (window.opener && !window.opener.closed) {
+                window.close();
+            } else {
+                window.location.href = "{% url 'product_list' %}";
+            }
+        }, 1500);
     }
 
     function initScanner() {

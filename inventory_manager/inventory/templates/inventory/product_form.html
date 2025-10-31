@@ -59,16 +59,23 @@
 
 <!-- ✅ Kamera entegrasyonu -->
 <script>
-document.getElementById('openCamera').addEventListener('click', () => {
-    // Kamera sayfasını aç
-    const cameraWindow = window.open("{% url 'camera_view' %}?field=purchase_barcode", "_blank", "width=800,height=600");
+document.addEventListener('DOMContentLoaded', () => {
+    const purchaseBarcodeInput = document.getElementById('id_purchase_barcode');
+    const openCameraButton = document.getElementById('openCamera');
 
-    // Kamera penceresinden gelen mesajı dinle
-    window.addEventListener('message', (event) => {
-        if (event.data && event.data.type === 'barcode_scanned') {
-            document.getElementById('id_purchase_barcode').value = event.data.value;
+    function handleBarcodeMessage(event) {
+        if (event.data && event.data.type === 'barcode_scanned' && event.data.field === 'purchase_barcode') {
+            purchaseBarcodeInput.value = event.data.value;
         }
-    });
+    }
+
+    if (openCameraButton) {
+        openCameraButton.addEventListener('click', () => {
+            window.open("{% url 'camera_view' %}?field=purchase_barcode", "_blank", "width=800,height=600");
+        });
+    }
+
+    window.addEventListener('message', handleBarcodeMessage);
 });
 </script>
 {% endblock %}
