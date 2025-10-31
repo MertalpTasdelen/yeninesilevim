@@ -11,8 +11,8 @@
 
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div id="barcode-reader"
-                 style="width: 100%; aspect-ratio: 4 / 3; border: 3px solid #ccc; border-radius: 12px; overflow: hidden;">
+            <div id="barcode-reader" style="width: 100%; height: 60vh; border: 3px solid #ccc;
+            border-radius: 12px; overflow: hidden;">
             </div>
         </div>
     </div>
@@ -22,127 +22,140 @@
         <button id="closeButton" class="btn btn-danger">Kapat</button>
     </div>
 </div>
+<style>
+  #barcode-reader {
+      width: 100%;
+      height: 60vh; /* ekranın %60’ını kaplar */
+      border: 3px solid #ccc;
+      border-radius: 12px;
+      overflow: hidden;
+  }
+
+  #barcode-reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover;
+  }
+</style>
 
 <!-- QuaggaJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const statusMsg = document.getElementById("statusMessage");
-    const retryBtn = document.getElementById("retryButton");
-    const closeBtn = document.getElementById("closeButton");
+    document.addEventListener("DOMContentLoaded", function () {
+        const statusMsg = document.getElementById("statusMessage");
+        const retryBtn = document.getElementById("retryButton");
+        const closeBtn = document.getElementById("closeButton");
 
-    // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
-    const urlParams = new URLSearchParams(window.location.search);
-    const targetField = urlParams.get("field") || "product_search";
+        // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetField = urlParams.get("field") || "product_search";
 
-    function updateStatus(message, type = "info") {
-        statusMsg.className = `alert alert-${type}`;
-        statusMsg.textContent = message;
-    }
-
-    function sendResultToParent(code) {
-        const payload = { type: "barcode_scanned", value: code, field: targetField };
-        let delivered = false;
-
-        if (window.opener && !window.opener.closed) {
-            try {
-                window.opener.postMessage(payload, "*");
-                delivered = true;
-            } catch (e) {
-                console.error("Mesaj gönderilemedi:", e);
-            }
+        function updateStatus(message, type = "info") {
+            statusMsg.className = `alert alert-${type}`;
+            statusMsg.textContent = message;
         }
 
-        if (!delivered) {
-            try {
-                localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
-                updateStatus("Barkod okundu. Ürün listesindeki arama kutusuna gönderiliyor...", "success");
-            } catch (storageError) {
-                console.error("Barkod localStorage'a yazılamadı:", storageError);
-                updateStatus("Barkod okundu ama sonuç kaydedilemedi.", "warning");
-            }
-        } else {
-            updateStatus(`Barkod okundu: ${code}`, "success");
-        }
+        function sendResultToParent(code) {
+            const payload = { type: "barcode_scanned", value: code, field: targetField };
+            let delivered = false;
 
-        // Birkaç saniye sonra otomatik kapanma
-        setTimeout(() => {
             if (window.opener && !window.opener.closed) {
-                window.close();
-            } else {
-                window.location.href = "{% url 'product_list' %}";
+                try {
+                    window.opener.postMessage(payload, "*");
+                    delivered = true;
+                } catch (e) {
+                    console.error("Mesaj gönderilemedi:", e);
+                }
             }
-        }, 1500);
-    }
 
-    function initScanner() {
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
-            return;
+            if (!delivered) {
+                try {
+                    localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
+                    updateStatus("Barkod okundu. Ürün listesindeki arama kutusuna gönderiliyor...", "success");
+                } catch (storageError) {
+                    console.error("Barkod localStorage'a yazılamadı:", storageError);
+                    updateStatus("Barkod okundu ama sonuç kaydedilemedi.", "warning");
+                }
+            } else {
+                updateStatus(`Barkod okundu: ${code}`, "success");
+            }
+
+            // Birkaç saniye sonra otomatik kapanma
+            setTimeout(() => {
+                if (window.opener && !window.opener.closed) {
+                    window.close();
+                } else {
+                    window.location.href = "{% url 'product_list' %}";
+                }
+            }, 1500);
         }
 
-        updateStatus("Kamera başlatılıyor...");
-
-        Quagga.init({
-            inputStream: {
-                name: "Live",
-                type: "LiveStream",
-                target: document.getElementById("barcode-reader"),
-                constraints: {
-                    facingMode: "environment",
-                    width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                }
-            },
-            decoder: {
-                readers: [
-                    "code_128_reader",
-                    "ean_reader",
-                    "ean_8_reader",
-                    "code_39_reader",
-                    "codabar_reader",
-                    "upc_reader",
-                    "upc_e_reader",
-                    "i2of5_reader",
-                    "2of5_reader",
-                    "code_93_reader"
-                ]
-            },
-            locate: true
-        }, function (err) {
-            if (err) {
-                console.error("Quagga init error:", err);
-                updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
-                retryBtn.classList.remove("d-none");
+        function initScanner() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
                 return;
             }
-            updateStatus("Kamera aktif. Barkodu okutun...");
-            Quagga.start();
+
+            updateStatus("Kamera başlatılıyor...");
+
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.getElementById("barcode-reader"),
+                    constraints: {
+                        facingMode: "environment",
+                        width: { ideal: window.innerWidth },
+                        height: { ideal: window.innerHeight }
+                    }
+                },
+                decoder: {
+                    readers: [
+                        "ean_reader"
+                    ]
+                },
+                locate: true,
+                numOfWorkers: 4,
+                frequency: 24,
+                halfSample: false,
+                locator: {
+                    patchSize: "large",  // “large” veya “x-large” ile de deneyebilirsin
+                    halfSample: false
+                },
+            }, function (err) {
+                if (err) {
+                    console.error("Quagga init error:", err);
+                    updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
+                    retryBtn.classList.remove("d-none");
+                    return;
+                }
+                updateStatus("Kamera aktif. Barkodu okutun...");
+                Quagga.start();
+            });
+
+            Quagga.onDetected(result => {
+                const code = result?.codeResult?.code;
+                if (code) {
+                    Quagga.stop();
+                    updateStatus(`Barkod okundu: ${code}`, "success");
+                    sendResultToParent(code);
+                }
+            });
+        }
+
+        retryBtn.addEventListener("click", () => {
+            retryBtn.classList.add("d-none");
+            initScanner();
         });
 
-        Quagga.onDetected(result => {
-            const code = result?.codeResult?.code;
-            if (code) {
-                Quagga.stop();
-                updateStatus(`Barkod okundu: ${code}`, "success");
-                sendResultToParent(code);
-            }
+        closeBtn.addEventListener("click", () => {
+            Quagga.stop();
+            window.close();
         });
-    }
 
-    retryBtn.addEventListener("click", () => {
-        retryBtn.classList.add("d-none");
+        // Sayfa yüklenince tarayıcıyı başlat
         initScanner();
     });
-
-    closeBtn.addEventListener("click", () => {
-        Quagga.stop();
-        window.close();
-    });
-
-    // Sayfa yüklenince tarayıcıyı başlat
-    initScanner();
-});
 </script>
 {% endblock %}
