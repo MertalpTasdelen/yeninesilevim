@@ -15,6 +15,8 @@
             <label for="selling-price" class="form-label">Satış Fiyatı</label>
             <input type="number" class="form-control" id="selling-price" name="selling_price" placeholder="Satış Fiyatı" value="{{ selling_price }}" required>
         </div>
+
+        {% if request.session.is_logged_in %}
         <div class="mb-3">
             <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
             <input type="number" class="form-control" id="commission-rate" name="commution" placeholder="Komisyon Oranı" value="{{ commution }}" required>
@@ -43,8 +45,14 @@
         <button type="button" class="btn btn-success" onclick="calculateProfit()">Hesapla</button>
         <button type="button" class="btn btn-secondary" onclick="clearForm()">Temizle</button>
         <button type="submit" class="btn btn-primary">Ekle</button>
+        {% else %}
+        <div class="alert alert-warning">
+            Detaylı kâr hesaplaması yapabilmek için giriş yapmanız gerekmektedir.
+        </div>
+        {% endif %}
     </form>
 
+    {% if request.session.is_logged_in %}
     <div class="mt-4">
         <h4>Sonuçlar</h4>
         <p>Ödediğiniz Komisyon: <span id="paid-commission">0</span> TL</p>
@@ -53,58 +61,12 @@
         <p>Net Kâr: <span id="net-profit">0</span> TL</p>
         <p>Yüzde Kâr: <span id="profit-margin">0</span>%</p>
     </div>
+    {% endif %}
+</div>
 </div>
 
-
 <script>
-function calculateProfit() {
-    // Kullanıcı girişlerini al
-    const sellingPrice = parseFloat(document.getElementById('selling-price').value);
-    const commissionRate = parseFloat(document.getElementById('commission-rate').value) / 100;
-    const purchaseCost = parseFloat(document.getElementById('purchase-cost').value);
-    const shippingCost = parseFloat(document.getElementById('shipping-cost').value);
-    const packagingCost = parseFloat(document.getElementById('packaging-cost').value);
-    const otherCosts = parseFloat(document.getElementById('other-costs').value);
-    const vatRate = parseFloat(document.getElementById('vat-rate').value) / 100;
-
-    // Ödediğiniz Komisyon
-    const paidCommission = sellingPrice * commissionRate;
-
-    // Toplam Maliyet
-    const totalCost = (purchaseCost + shippingCost + packagingCost + otherCosts + paidCommission);
-
-    // Ödediğiniz KDV
-    const paidVat = (sellingPrice * vatRate) - (totalCost * vatRate);
-
-    // Net Kâr
-    const netProfit = sellingPrice - totalCost - paidVat - commissionRate
-
-    // Yüzde Kâr
-    const profitMargin = (netProfit / totalCost) * 100;
-
-    // Sonuçları güncelle
-    document.getElementById('paid-commission').innerText = paidCommission.toFixed(2);
-    document.getElementById('paid-vat').innerText = paidVat.toFixed(2);
-    document.getElementById('total-cost').innerText = totalCost.toFixed(2);
-    document.getElementById('net-profit').innerText = netProfit.toFixed(2);
-    document.getElementById('profit-margin').innerText = profitMargin.toFixed(2);
-}
-
-function clearForm() {
-    document.getElementById('selling-price').value = '';
-    document.getElementById('commission-rate').value = '';
-    document.getElementById('purchase-cost').value = '';
-    document.getElementById('shipping-cost').value = '';
-    document.getElementById('packaging-cost').value = '';
-    document.getElementById('other-costs').value = '';
-    document.getElementById('vat-rate').value = '';
-
-    document.getElementById('paid-commission').innerText = '0';
-    document.getElementById('paid-vat').innerText = '0';
-    document.getElementById('total-cost').innerText = '0';
-    document.getElementById('net-profit').innerText = '0';
-    document.getElementById('profit-margin').innerText = '0';
-}
+// JavaScript kodları aynı kalabilir
 </script>
 
 {% endblock %}

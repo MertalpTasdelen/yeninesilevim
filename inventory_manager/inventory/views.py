@@ -138,14 +138,24 @@ def scan_barcode(request):
     return JsonResponse({'message': 'Invalid request'})
 
 def profit_calculator(request):
-    barcode = request.GET.get('barcode')
-    selling_price = request.GET.get('selling_price')
-    commution = request.GET.get('commution')
-    context = {
-        'barcode': barcode,
-        'selling_price': selling_price,
-        'commution': commution,
-    }
+    if not request.session.get('is_logged_in'):
+        # Eğer giriş yapılmamışsa sadece satış fiyatını göster
+        barcode = request.GET.get('barcode')
+        selling_price = request.GET.get('selling_price')
+        context = {
+            'barcode': barcode,
+            'selling_price': selling_price,
+        }
+    else:
+        # Giriş yapılmışsa tüm bilgileri göster
+        barcode = request.GET.get('barcode')
+        selling_price = request.GET.get('selling_price')
+        commution = request.GET.get('commution')
+        context = {
+            'barcode': barcode,
+            'selling_price': selling_price,
+            'commution': commution,
+        }
     return render(request, 'inventory/profit_calculator.html', context)
 
 @csrf_exempt
@@ -208,7 +218,7 @@ def delete_profit_calculation(request, id):
     return JsonResponse({'success': False}, status=400)
 
 def login_view(request):
-    LOGIN_PASSWORD = '123456'
+    LOGIN_PASSWORD = '020524'
 
     if request.method == 'POST':
         password = request.POST.get('password')
