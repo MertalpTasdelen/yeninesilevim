@@ -109,43 +109,66 @@
             });
         }
 
-        // İlk yüklemede butonları kontrol et
+        // Initially check button states
         checkAuthButtons();
 
-        // AJAX ile sayfa yüklendiğinde butonları kontrol et
+        // Re-check button states after each AJAX load
         $(document).ajaxComplete(function () {
             checkAuthButtons();
+        });
+
+        // Intercept stock adjustment forms to prevent full page reload
+        $(document).on('submit', '.stock-adjust-form', function (e) {
+            e.preventDefault();
+            const form = $(this);
+            // Skip if button is disabled (not logged in)
+            if (form.find('button').hasClass('disabled')) {
+                return;
+            }
+            fetch(form.attr('action'), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => response.json())
+                .then(data => {
+                    const productId = form.data('product-id');
+                    // Update the stock display for the specific product
+                    document.getElementById('stock-' + productId).innerText = data.stock;
+                });
         });
     });
 
     function checkAuthButtons() {
-    const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
+        const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
 
-    const editButtons = document.querySelectorAll('.edit-button');
-    const stockButtons = document.querySelectorAll('.stock-adjust-button');
+        const editButtons = document.querySelectorAll('.edit-button');
+        const stockButtons = document.querySelectorAll('.stock-adjust-button');
 
-    editButtons.forEach(button => {
-        if (!isLoggedIn) {
-            button.classList.add('disabled');
-            button.setAttribute('disabled', 'disabled');
-        } else {
-            button.classList.remove('disabled');
-            button.removeAttribute('disabled');
-        }
-    });
+        editButtons.forEach(button => {
+            if (!isLoggedIn) {
+                button.classList.add('disabled');
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.classList.remove('disabled');
+                button.removeAttribute('disabled');
+            }
+        });
 
-    stockButtons.forEach(button => {
-        if (!isLoggedIn) {
-            button.classList.add('disabled');
-            button.setAttribute('disabled', 'disabled');
-        } else {
-            button.classList.remove('disabled');
-            button.removeAttribute('disabled');
-        }
-    });
+        stockButtons.forEach(button => {
+            if (!isLoggedIn) {
+                button.classList.add('disabled');
+                button.setAttribute('disabled', 'disabled');
+            } else {
+                button.classList.remove('disabled');
+                button.removeAttribute('disabled');
+            }
+        });
     }
 
-    // Pagination için AJAX
+    // Pagination for AJAX
     $(document).on('click', '.pagination a', function (e) {
         e.preventDefault();
         var page = $(this).attr('href').split('page=')[1];
@@ -157,7 +180,7 @@
             url: "/ajax/search/?page=" + page,
             success: function (data) {
                 $('#product-list').html(data);
-                checkAuthButtons(); // Yeni yüklenen içerik için butonları kontrol et
+                checkAuthButtons();
             }
         });
     }
@@ -176,7 +199,7 @@
                 document.getElementById('product-list').innerHTML = data.html;
                 page = 1; // Reset page number for infinite scrolling
                 hasNext = data.has_next; // Update hasNext based on response
-                checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
+                checkAuthButtons();
             });
     });
 
@@ -196,8 +219,8 @@
                 .then(data => {
                     document.getElementById('product-list').insertAdjacentHTML('beforeend', data.html);
                     loading = false;
-                    hasNext = data.has_next; // Update hasNext based on response
-                    checkAuthButtons(); // Yeni içerik yüklendiğinde butonları kontrol et
+                    hasNext = data.has_next;
+                    checkAuthButtons();
                 });
         }
     });

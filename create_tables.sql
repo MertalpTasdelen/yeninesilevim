@@ -3,6 +3,7 @@ CREATE TABLE inventory_product (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
     barcode VARCHAR(255) UNIQUE NOT NULL,
+    purchase_barcode VARCHAR
     purchase_price DECIMAL(10, 2) NOT NULL,
     selling_price DECIMAL(10, 2) NOT NULL,
     commution DECIMAL(10, 2) NOT NULL,

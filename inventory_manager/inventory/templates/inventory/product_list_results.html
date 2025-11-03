@@ -1,3 +1,13 @@
+{% comment %}
+    This template renders a paginated list of products.  To protect
+    sensitive business information (purchase price, commission rates and
+    stock levels) when the viewer has not authenticated, the values
+    are conditionally displayed.  The view passes the request object
+    into the template context, so we can check the `is_logged_in` flag
+    stored in the session.  If the flag is false or missing, the
+    sensitive fields are hidden entirely.
+{% endcomment %}
+
 {% for product in page_obj %}
 <div class="col-12 col-sm-6 col-md-4 col-lg-3 product-item">
     <div class="card mb-4">
@@ -13,32 +23,45 @@
                 <div class="col-12">
                     <h5 class="card-title">{{ product.name }}</h5>
                     <p class="card-text">Barkod: {{ product.barcode }}</p>
+                    {# Only show purchase price, commission and stock when the user is authenticated #}
                     {% if request.session.is_logged_in %}
                         <p class="card-text">Alış Fiyatı: {{ product.purchase_price }}</p>
-                    {% endif %}
-                    <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
-                    {% if request.session.is_logged_in %}
+                        <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
                         <p class="card-text">Komisyon: %{{ product.commution }}</p>
                         <p class="card-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></p>
+                    {% else %}
+                        <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
+                        <p class="card-text text-muted">Alış fiyatı, komisyon ve stok bilgileri için giriş yapın.</p>
                     {% endif %}
-                    
                     <div class="btn-group product-buttons" role="group">
                         <button type="button" class="btn btn-info btn-sm me-2" onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}')">Kâr Hesapla</button>
-                        {% if request.session.is_logged_in %}
-                            <a href="{% url 'edit_product' product.id %}" class="btn btn-warning btn-sm me-2 edit-button">Düzenle</a>
-                            <form method="post" action="{% url 'adjust_stock' product.id 1 %}" style="display:inline;" class="me-2">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-success btn-sm stock-adjust-button">+1</button>
-                            </form>
-                            <form method="post" action="{% url 'adjust_stock' product.id -1 %}" style="display:inline;">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger btn-sm stock-adjust-button">-1</button>
-                            </form>
-                        {% endif %}
+                        <a href="{% url 'edit_product' product.id %}" class="btn btn-warning btn-sm me-2 edit-button">Düzenle</a>
+                        <form method="post"
+                              action="{% url 'adjust_stock' product.id 1 %}"
+                              style="display:inline;"
+                              class="stock-adjust-form me-2"
+                              data-product-id="{{ product.id }}"
+                              data-amount="1">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-success btn-sm stock-adjust-button">+1</button>
+                        </form>
+                        <form method="post"
+                              action="{% url 'adjust_stock' product.id -1 %}"
+                              style="display:inline;"
+                              class="stock-adjust-form"
+                              data-product-id="{{ product.id }}"
+                              data-amount="-1">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-danger btn-sm stock-adjust-button">-1</button>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
+{% empty %}
+<div class="col-12">
+    <p class="text-center">Ürün bulunamadı.</p>
 </div>
 {% endfor %}
