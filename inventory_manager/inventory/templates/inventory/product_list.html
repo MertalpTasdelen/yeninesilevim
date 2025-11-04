@@ -6,57 +6,289 @@
     <form method="GET" action="{% url 'product_list' %}" class="mb-4">
         <div class="input-group mb-3">
             <input type="text" id="search-input" name="q" class="form-control"
-                placeholder="Ürün adı, barkod veya alış barkodu ile ara..." value="{{ query|default_if_none:'' }}">
-            <button type="button" class="btn btn-outline-secondary" id="openSearchCamera">
+                placeholder="Ürün adı, barkod veya alış barkodu ile ara..." value="{{ query|default_if_none:'' }}"
+                aria-label="Search products" aria-describedby="filter-icon">
+            <button type="button" class="btn btn-outline-secondary" id="openSearchCamera"
+                title="Kamera ile barkod tara">
                 <i class="bi bi-camera"></i>
             </button>
         </div>
+        <div class="input-group mb-3">
+            <span class="input-group-text" id="filter-icon">
+                <i class="fas fa-filter"></i>
+            </span>
+            <select class="form-select" id="sort-by" name="sort_by">
+                <option value="" {% if not sort_by %}selected{% endif %}>Sıralama seçin</option>
+                <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stoğa göre azalan</option>
+                <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stoğa göre artan</option>
+                <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Satış
+                    fiyatına göre azalan</option>
+                <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Satış
+                    fiyatına göre artan</option>
+            </select>
+        </div>
     </form>
-
+    <!-- ✅ Success toast for scanned barcode -->
+    <div id="scanSuccessToast" class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3"
+         role="alert" aria-live="assertive" aria-atomic="true" style="display:none;">
+        <div class="d-flex">
+            <div class="toast-body">
+                Barkod başarıyla okundu!
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                    aria-label="Kapat" onclick="this.closest('.toast').style.display='none'"></button>
+        </div>
+    </div>
     <div id="product-list" class="row">
         {% include 'inventory/product_list_results.html' %}
     </div>
 </div>
 
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
+// CSRF helper: read the csrftoken from browser cookies.  Django will
+// reject POST requests without a valid CSRF header, so we expose this
+// function and variable globally for reuse in AJAX calls.
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+const csrftoken = getCookie('csrftoken');
+/**
+ * This script handles three major concerns for the product list page:
+ * 1. Live search and infinite scroll of products via AJAX.
+ * 2. Barcode scanning integration to populate the search field and trigger a search.
+ * 3. Permission-aware UI updates (disabling buttons when not logged in) and stock adjustments.
+ *
+ * By consolidating the logic into a single event-driven flow, we reduce
+ * duplication and potential race conditions. The search now uses the same
+ * endpoint as the normal list view and correctly updates pagination state.
+ */
 document.addEventListener('DOMContentLoaded', function () {
+    // Elements
     const searchInput = document.getElementById('search-input');
     const cameraButton = document.getElementById('openSearchCamera');
+    const productList = document.getElementById('product-list');
+    const sortBySelect = document.getElementById('sort-by');
+    const scanToast = document.getElementById('scanSuccessToast');
+    // State
+    let page = 1;
+    let loading = false;
+    let hasNext = true;
 
-    function applyScannedBarcode(value) {
-        if (!searchInput) return;
-        searchInput.value = value;
-        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    /**
+     * Fetch product list HTML from the server and update the page.
+     * When reset is true, the current results are replaced and the page counter
+     * is reset. Otherwise results are appended.
+     */
+    function fetchResults(reset = false) {
+        // Do not initiate multiple concurrent requests.
+        if (loading) return;
+        loading = true;
+        // Build query string with current search and sort parameters.
+        const params = new URLSearchParams();
+        const queryValue = searchInput.value || '';
+        const sortValue = sortBySelect ? sortBySelect.value : '';
+        if (queryValue) params.append('q', queryValue);
+        if (sortValue) params.append('sort_by', sortValue);
+        params.append('page', page);
+        fetch(`{% url 'product_list' %}?${params.toString()}`, {
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (reset) {
+                productList.innerHTML = data.html;
+                // After resetting the page, the next page number is 2.
+                page = 2;
+            } else {
+                productList.insertAdjacentHTML('beforeend', data.html);
+                page += 1;
+            }
+            hasNext = data.has_next;
+            // After injecting new HTML, update any UI elements that depend on auth.
+            checkAuthButtons();
+        })
+        .catch(err => {
+            console.error('Ürün listesi yüklenirken hata oluştu:', err);
+        })
+        .finally(() => {
+            loading = false;
+        });
     }
 
+    /**
+     * Apply a scanned barcode value to the search input and trigger a search.
+     * Shows a brief toast notification to confirm the scan.
+     */
+    function applyScannedBarcode(value) {
+        if (!value) return;
+        searchInput.value = value;
+        searchInput.focus();
+        // Trigger input event to refresh search results.
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        if (scanToast) {
+            scanToast.style.display = 'block';
+            setTimeout(() => {
+                scanToast.style.display = 'none';
+            }, 1500);
+        }
+    }
+
+    /**
+     * Handle payloads from the camera window or localStorage that contain a scanned barcode.
+     */
     function handleBarcodePayload(payload) {
-        if (payload && payload.type === 'barcode_scanned' && payload.field === 'product_search') {
+        if (payload && payload.type === 'barcode_scanned' && payload.field === 'product_search' && payload.value) {
             applyScannedBarcode(payload.value);
         }
     }
 
+    /**
+     * Consume a stored barcode from localStorage and remove it. This allows
+     * reloading the page (or focusing) to apply a previously scanned code.
+     */
     function consumeStoredBarcode() {
-        const stored = localStorage.getItem('last_scanned_barcode');
-        if (!stored) return;
-        const parsed = JSON.parse(stored);
-        handleBarcodePayload(parsed);
-        localStorage.removeItem('last_scanned_barcode');
+        try {
+            const stored = localStorage.getItem('last_scanned_barcode');
+            if (!stored) return;
+            const parsed = JSON.parse(stored);
+            handleBarcodePayload(parsed);
+            localStorage.removeItem('last_scanned_barcode');
+        } catch (err) {
+            console.error('Kaydedilen barkod okunurken hata oluştu:', err);
+        }
     }
 
-    window.addEventListener('message', (e) => handleBarcodePayload(e.data));
-    window.addEventListener('focus', consumeStoredBarcode);
+    // Search input live filtering.
+    searchInput.addEventListener('input', () => {
+        page = 1;
+        hasNext = true;
+        fetchResults(true);
+    });
 
+    // Sort dropdown change reloads results via AJAX instead of full form submit.
+    if (sortBySelect) {
+        sortBySelect.addEventListener('change', () => {
+            page = 1;
+            hasNext = true;
+            fetchResults(true);
+        });
+    }
+
+    // Infinite scroll: load more results when approaching the bottom.
+    window.addEventListener('scroll', () => {
+        if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 500) {
+            if (!loading && hasNext) {
+                fetchResults(false);
+            }
+        }
+    });
+
+    // Camera button opens the scanning view in the same tab on mobile or a new window on desktop.
     if (cameraButton) {
         cameraButton.addEventListener('click', () => {
-            if (/Mobi|Android/i.test(navigator.userAgent)) {
-                window.location.href = "{% url 'camera_view' %}?field=product_search";
+            const cameraUrl = "{% url 'camera_view' %}?field=product_search";
+            const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+            if (isMobile) {
+                window.location.href = cameraUrl;
             } else {
-                window.open("{% url 'camera_view' %}?field=product_search", "_blank", "width=800,height=600");
+                window.open(cameraUrl, "_blank", "width=800,height=600");
             }
         });
     }
 
+    // Listen for messages from the camera window (postMessage).
+    window.addEventListener('message', (e) => handleBarcodePayload(e.data));
+    // Listen for localStorage changes to apply scanned barcodes when switching tabs or windows.
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'last_scanned_barcode') {
+            consumeStoredBarcode();
+        }
+    });
+    // When the tab regains focus, consume any stored barcode.
+    window.addEventListener('focus', consumeStoredBarcode);
+    // On initial load, consume any stored barcode from a previous scan.
     consumeStoredBarcode();
+
+    /**
+     * Intercept stock adjustment forms (plus/minus buttons) and submit via AJAX
+     * instead of doing a full page reload. This function relies on jQuery to
+     * register the delegated event handler.
+     */
+    $(document).on('submit', '.stock-adjust-form', function (e) {
+        e.preventDefault();
+        const form = $(this);
+        // Skip if the button is disabled.
+        if (form.find('button').hasClass('disabled')) {
+            return;
+        }
+        const action = form.attr('action');
+        fetch(action, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrftoken,
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(res => res.json())
+        .then(data => {
+            const productId = form.data('product-id');
+            document.getElementById('stock-' + productId).innerText = data.stock;
+        });
+    });
+
+    // Initial button state update.
+    checkAuthButtons();
 });
+
+/**
+ * Enable or disable edit and stock buttons based on login state. This function
+ * is called after each AJAX update to ensure newly injected elements are handled.
+ */
+function checkAuthButtons() {
+    const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
+    const editButtons = document.querySelectorAll('.edit-button');
+    const stockButtons = document.querySelectorAll('.stock-adjust-button');
+    editButtons.forEach(btn => {
+        if (!isLoggedIn) {
+            btn.classList.add('disabled');
+            btn.setAttribute('disabled', 'disabled');
+        } else {
+            btn.classList.remove('disabled');
+            btn.removeAttribute('disabled');
+        }
+    });
+    stockButtons.forEach(btn => {
+        if (!isLoggedIn) {
+            btn.classList.add('disabled');
+            btn.setAttribute('disabled', 'disabled');
+        } else {
+            btn.classList.remove('disabled');
+            btn.removeAttribute('disabled');
+        }
+    });
+}
+
+/**
+ * Redirect to the profit calculator for a specific product. Encodes parameters
+ * to ensure special characters do not break the URL.
+ */
+function calculatePrice(barcode, sellingPrice, commution) {
+    const url = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
+    window.location.href = url;
+}
 </script>
 {% endblock %}
