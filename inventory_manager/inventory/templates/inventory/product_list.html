@@ -57,7 +57,6 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         const searchInput = document.getElementById('search-input');
-        const cameraButton = document.getElementById('openSearchCamera');
 
         function applyScannedBarcode(value) {
             if (!searchInput) {
@@ -69,8 +68,57 @@
         }
 
         function handleBarcodePayload(payload) {
-            if (payload && payload.type === 'barcode_scanned' && payload.field === 'product_search' && payload.value) {
-                applyScannedBarcode(payload.value);
+            console.log('Gelen payload:', payload); // Debug log
+
+            // Payload kontrolü
+            if (!payload || !payload.type || !payload.value) {
+                console.error('Geçersiz payload formatı:', payload);
+                return;
+            }
+
+            // Barkod tarama işlemi için kontrol
+            if (payload.type === 'barcode_scanned') {
+                const searchInput = document.getElementById('search-input');
+
+                switch (payload.field) {
+                    case 'product_search':
+                        // Ürün arama alanı için
+                        if (searchInput) {
+                            searchInput.value = payload.value;
+                            // Manuel olarak input event'ini tetikle
+                            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                            console.log('Arama tetiklendi:', payload.value);
+                        } else {
+                            console.error('Arama input elementi bulunamadı');
+                        }
+                        break;
+
+                    case 'purchase_barcode':
+                        // Alış barkodu alanı için
+                        const purchaseBarcodeInput = document.getElementById('id_purchase_barcode');
+                        if (purchaseBarcodeInput) {
+                            purchaseBarcodeInput.value = payload.value;
+                            console.log('Alış barkodu güncellendi:', payload.value);
+                        }
+                        break;
+
+                    default:
+                        console.warn('Bilinmeyen alan tipi:', payload.field);
+                        break;
+                }
+
+                // Başarılı okuma sonrası kamera penceresini kapat
+                if (window.opener && payload.closeAfterScan) {
+                    try {
+                        const videoElem = document.getElementById('barcode-video');
+                        if (videoElem && videoElem.srcObject) {
+                            videoElem.srcObject.getTracks().forEach(track => track.stop());
+                        }
+                        window.close();
+                    } catch (e) {
+                        console.error('Kamera kapatma hatası:', e);
+                    }
+                }
             }
         }
 
@@ -91,7 +139,16 @@
         }
 
         window.addEventListener('message', (event) => {
-            handleBarcodePayload(event.data);
+            console.log('Mesaj alındı:', event.data);
+            if (event.data && event.data.type === 'barcode_scanned' && event.data.field === 'product_search') {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.value = event.data.value;
+                    // Arama işlemini tetikle
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    console.log('Barkod değeri arama kutusuna yerleştirildi:', event.data.value);
+                }
+            }
         });
 
         window.addEventListener('storage', (event) => {
@@ -103,9 +160,19 @@
         window.addEventListener('focus', consumeStoredBarcode);
         consumeStoredBarcode();
 
+        // Kamera butonu işleyicisi
+        const cameraButton = document.getElementById('openSearchCamera');
         if (cameraButton) {
-            cameraButton.addEventListener('click', () => {
-                window.open("{% url 'camera_view' %}?field=product_search", "_blank", "width=800,height=600");
+            cameraButton.addEventListener('click', function() {
+                const cameraWindow = window.open("{% url 'camera_view' %}?field=product_search", 
+                    "BarcodeScanner", 
+                    "width=800,height=600,resizable=yes"
+                );
+                if (cameraWindow) {
+                    cameraWindow.focus();
+                } else {
+                    alert('Pop-up penceresi açılamadı. Lütfen pop-up engelleyiciyi kontrol edin.');
+                }
             });
         }
 
@@ -143,29 +210,28 @@
 
     function checkAuthButtons() {
         const isLoggedIn = {{ request.session.is_logged_in|yesno:"true,false" }};
-
         const editButtons = document.querySelectorAll('.edit-button');
-        const stockButtons = document.querySelectorAll('.stock-adjust-button');
+    const stockButtons = document.querySelectorAll('.stock-adjust-button');
 
-        editButtons.forEach(button => {
-            if (!isLoggedIn) {
-                button.classList.add('disabled');
-                button.setAttribute('disabled', 'disabled');
-            } else {
-                button.classList.remove('disabled');
-                button.removeAttribute('disabled');
-            }
-        });
+    editButtons.forEach(button => {
+        if (!isLoggedIn) {
+            button.classList.add('disabled');
+            button.setAttribute('disabled', 'disabled');
+        } else {
+            button.classList.remove('disabled');
+            button.removeAttribute('disabled');
+        }
+    });
 
-        stockButtons.forEach(button => {
-            if (!isLoggedIn) {
-                button.classList.add('disabled');
-                button.setAttribute('disabled', 'disabled');
-            } else {
-                button.classList.remove('disabled');
-                button.removeAttribute('disabled');
-            }
-        });
+    stockButtons.forEach(button => {
+        if (!isLoggedIn) {
+            button.classList.add('disabled');
+            button.setAttribute('disabled', 'disabled');
+        } else {
+            button.classList.remove('disabled');
+            button.removeAttribute('disabled');
+        }
+    });
     }
 
     // Pagination for AJAX

@@ -11,8 +11,8 @@
 
     <div class="row justify-content-center">
         <div class="col-12 col-md-8 col-lg-6">
-            <div id="barcode-reader" style="width: 100%; height: 60vh; border: 3px solid #ccc;
-            border-radius: 12px; overflow: hidden;">
+            <div id="barcode-reader">
+                <video id="barcode-video" autoplay playsinline muted style="width: 100%; height: 100%;"></video>
             </div>
         </div>
     </div>
@@ -23,139 +23,168 @@
     </div>
 </div>
 <style>
-  #barcode-reader {
-      width: 100%;
-      height: 60vh; /* ekranın %60’ını kaplar */
-      border: 3px solid #ccc;
-      border-radius: 12px;
-      overflow: hidden;
-  }
+    #barcode-reader {
+        width: 100%;
+        height: 60vh;
+        /* ekranın %60’ını kaplar */
+        border: 3px solid #ccc;
+        border-radius: 12px;
+        overflow: hidden;
+    }
 
-  #barcode-reader video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover;
-  }
+    #barcode-reader video {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover;
+    }
 </style>
 
-<!-- QuaggaJS -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
+<!-- ZXing-js -->
+<script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/browser@latest/+esm';
 
-<script>
-    document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener("DOMContentLoaded", async () => {
         const statusMsg = document.getElementById("statusMessage");
         const retryBtn = document.getElementById("retryButton");
         const closeBtn = document.getElementById("closeButton");
+        const videoElem = document.getElementById("barcode-video");
+        let codeReader = null;
 
-        // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
         const urlParams = new URLSearchParams(window.location.search);
-        const targetField = urlParams.get("field") || "product_search";
+        const targetField = urlParams.get("field") || "direct";
 
         function updateStatus(message, type = "info") {
+            console.log("Status:", message); // Debug log
             statusMsg.className = `alert alert-${type}`;
             statusMsg.textContent = message;
         }
 
         function sendResultToParent(code) {
-            const payload = { type: "barcode_scanned", value: code, field: targetField };
-            let delivered = false;
+            console.log("Barkod okundu:", code);
 
-            if (window.opener && !window.opener.closed) {
-                try {
-                    window.opener.postMessage(payload, "*");
-                    delivered = true;
-                } catch (e) {
-                    console.error("Mesaj gönderilemedi:", e);
-                }
-            }
+            // Ana pencereye mesaj gönder
+            if (window.opener) {
+                const payload = {
+                    type: 'barcode_scanned',
+                    field: 'product_search',
+                    value: code
+                };
 
-            if (!delivered) {
-                try {
-                    localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
-                    updateStatus("Barkod okundu. Ürün listesindeki arama kutusuna gönderiliyor...", "success");
-                } catch (storageError) {
-                    console.error("Barkod localStorage'a yazılamadı:", storageError);
-                    updateStatus("Barkod okundu ama sonuç kaydedilemedi.", "warning");
-                }
-            } else {
+                window.opener.postMessage(payload, '*');
                 updateStatus(`Barkod okundu: ${code}`, "success");
-            }
 
-            // Birkaç saniye sonra otomatik kapanma
-            setTimeout(() => {
-                if (window.opener && !window.opener.closed) {
-                    window.close();
-                } else {
-                    window.location.href = "{% url 'product_list' %}";
+                // Kamerayı kapat
+                if (codeReader) {
+                    codeReader.reset();
                 }
-            }, 1500);
+                if (videoElem.srcObject) {
+                    videoElem.srcObject.getTracks().forEach(track => track.stop());
+                }
+
+                // Pencereyi hemen kapat
+                window.close();
+            }
         }
 
-        function initScanner() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
-                return;
-            }
+        async function requestCameraAndStart() {
+            updateStatus("Kamera izni isteniyor...");
+            retryBtn.classList.add("d-none");
 
-            updateStatus("Kamera başlatılıyor...");
+            try {
+                codeReader = new BrowserMultiFormatReader();
+                console.log("ZXing başlatıldı"); // Debug log
 
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.getElementById("barcode-reader"),
-                    constraints: {
-                        facingMode: "environment",
-                        width: { ideal: window.innerWidth },
-                        height: { ideal: window.innerHeight }
-                    }
-                },
-                decoder: {
-                    readers: [
-                        "ean_reader"
-                    ]
-                },
-                locate: true,
-                numOfWorkers: 4,
-                frequency: 24,
-                halfSample: false,
-                locator: {
-                    patchSize: "large",  // “large” veya “x-large” ile de deneyebilirsin
-                    halfSample: false
-                },
-            }, function (err) {
-                if (err) {
-                    console.error("Quagga init error:", err);
-                    updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
-                    retryBtn.classList.remove("d-none");
-                    return;
-                }
                 updateStatus("Kamera aktif. Barkodu okutun...");
-                Quagga.start();
-            });
 
-            Quagga.onDetected(result => {
-                const code = result?.codeResult?.code;
-                if (code) {
-                    Quagga.stop();
-                    updateStatus(`Barkod okundu: ${code}`, "success");
-                    sendResultToParent(code);
-                }
-            });
+                await codeReader.decodeFromVideoDevice(
+                    null, // varsayılan kamera
+                    'barcode-video',
+                    (result, err) => {
+                        if (result) {
+                            console.log("Barkod tespit edildi:", result); // Debug log
+                            const code = result.getText();
+                            if (code) {
+                                sendResultToParent(code);
+                            }
+                        }
+                        if (err && !(err instanceof TypeError)) {
+                            // Hata logla ama normal tarama hatalarını görmezden gel
+                            console.error("Tarama hatası:", err);
+                        }
+                    }
+                );
+            } catch (err) {
+                console.error("Kamera başlatma hatası:", err);
+                handleCameraError(err);
+            }
+        }
+
+
+        function handleCameraError(err) {
+            // Permissions API ile durum kontrolü (tüm tarayıcılar desteklemez)
+            if (navigator.permissions && navigator.permissions.query) {
+                navigator.permissions.query({ name: 'camera' })
+                    .then(p => {
+                        if (p.state === 'denied') {
+                            updateStatus("Kamera izni reddedildi. Tarayıcı ayarlarından kamera erişimini açın.", "danger");
+                            retryBtn.classList.remove("d-none");
+                        } else if (p.state === 'prompt') {
+                            updateStatus("Tarayıcı izin penceresi görüntülenemedi. Yeniden deneyin.", "warning");
+                            retryBtn.classList.remove("d-none");
+                        } else {
+                            updateStatus("Kamera başlatılamadı. Cihazda kamera yok veya başka bir uygulama kullanıyor olabilir.", "danger");
+                            retryBtn.classList.remove("d-none");
+                        }
+                    }).catch(() => {
+                        // Permissions API yoksa genel hata mesajı
+                        updateStatus("Kamera açılamadı — lütfen site ayarlarından kamerayı kontrol edin ve https kullandığınızdan emin olun.", "danger");
+                        retryBtn.classList.remove("d-none");
+                    });
+            } else {
+                updateStatus("Kamera açılamadı — lütfen site ayarlarından kamerayı kontrol edin ve https kullandığınızdan emin olun.", "danger");
+                retryBtn.classList.remove("d-none");
+            }
         }
 
         retryBtn.addEventListener("click", () => {
             retryBtn.classList.add("d-none");
-            initScanner();
+            requestCameraAndStart();
         });
 
         closeBtn.addEventListener("click", () => {
-            Quagga.stop();
+            if (codeReader) {
+                codeReader.reset();
+            }
+            if (videoElem.srcObject) {
+                videoElem.srcObject.getTracks().forEach(t => t.stop());
+            }
             window.close();
         });
 
-        // Sayfa yüklenince tarayıcıyı başlat
-        initScanner();
+        // Sayfa yüklendiğinde önce Permissions API ile durumu kontrol edip,
+        // eğer 'granted' ise yine de getUserMedia çağırıp stream başlatıyoruz.
+        (async () => {
+            try {
+                if (navigator.permissions && navigator.permissions.query) {
+                    const p = await navigator.permissions.query({ name: 'camera' });
+                    if (p.state === 'granted') {
+                        // yine de açıkça getUserMedia çağır (tarayıcı prompt göstermez ama izin var)
+                        requestCameraAndStart();
+                        return;
+                    }
+                    if (p.state === 'denied') {
+                        updateStatus("Kamera izni tarayıcı tarafından reddedilmiş. Lütfen site ayarlarından kamerayı açın.", "danger");
+                        retryBtn.classList.remove("d-none");
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Permissions API yoksa devam edip getUserMedia ile prompt göstereceğiz
+            }
+            // Normal akış - kullanıcıya izin penceresini tetikle
+            requestCameraAndStart();
+        })();
     });
 </script>
+
 {% endblock %}

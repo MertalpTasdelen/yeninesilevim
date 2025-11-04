@@ -267,7 +267,7 @@ def delete_profit_calculation(request, id):
 
 
 def login_view(request):
-    LOGIN_PASSWORD = '020524'
+    LOGIN_PASSWORD = '123456'
     if request.method == 'POST':
         password = request.POST.get('password')
         if password == LOGIN_PASSWORD:
