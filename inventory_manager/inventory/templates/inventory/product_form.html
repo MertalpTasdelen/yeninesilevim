@@ -6,83 +6,65 @@
 
     <form method="post">
         {% csrf_token %}
-
         <div class="mb-3">
-            {{ form.name.label_tag }}
-            {{ form.name }}
+            {{ form.name.label_tag }} {{ form.name }}
         </div>
 
         <div class="mb-3">
-            {{ form.barcode.label_tag }}
-            {{ form.barcode }}
+            {{ form.barcode.label_tag }} {{ form.barcode }}
         </div>
 
-        <!-- ✅ Alış Barkodu özel alan -->
         <div class="mb-3">
             {{ form.purchase_barcode.label_tag }}
             <div class="input-group">
                 {{ form.purchase_barcode }}
-                <button type="button" id="openCamera" class="btn btn-outline-secondary">
-                    📷
-                </button>
+                <button type="button" id="openCamera" class="btn btn-outline-secondary">📷</button>
             </div>
         </div>
 
-        <div class="mb-3">
-            {{ form.purchase_price.label_tag }}
-            {{ form.purchase_price }}
-        </div>
-
-        <div class="mb-3">
-            {{ form.selling_price.label_tag }}
-            {{ form.selling_price }}
-        </div>
-
-        <div class="mb-3">
-            {{ form.commution.label_tag }}
-            {{ form.commution }}
-        </div>
-
-        <div class="mb-3">
-            {{ form.stock.label_tag }}
-            {{ form.stock }}
-        </div>
-
-        <div class="mb-3">
-            {{ form.image_url.label_tag }}
-            {{ form.image_url }}
-        </div>
+        <div class="mb-3">{{ form.purchase_price.label_tag }} {{ form.purchase_price }}</div>
+        <div class="mb-3">{{ form.selling_price.label_tag }} {{ form.selling_price }}</div>
+        <div class="mb-3">{{ form.commution.label_tag }} {{ form.commution }}</div>
+        <div class="mb-3">{{ form.stock.label_tag }} {{ form.stock }}</div>
+        <div class="mb-3">{{ form.image_url.label_tag }} {{ form.image_url }}</div>
 
         <button type="submit" class="btn btn-primary">Kaydet</button>
     </form>
-    {% if form.instance.id %}
-    <hr>
-    <form method="post" action="{% url 'delete_product' form.instance.id %}" onsubmit="return confirm('Bu ürünü silmek istediğinize emin misiniz?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Sil</button>
-    </form>
-    {% endif %}
 </div>
 
-<!-- ✅ Kamera entegrasyonu -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const purchaseBarcodeInput = document.getElementById('id_purchase_barcode');
     const openCameraButton = document.getElementById('openCamera');
 
-    function handleBarcodeMessage(event) {
-        if (event.data && event.data.type === 'barcode_scanned' && event.data.field === 'purchase_barcode') {
-            purchaseBarcodeInput.value = event.data.value;
+    function applyScannedBarcode(payload) {
+        if (payload && payload.type === 'barcode_scanned' && payload.field === 'purchase_barcode') {
+            purchaseBarcodeInput.value = payload.value;
         }
     }
 
+    function consumeStoredBarcode() {
+        const stored = localStorage.getItem('last_scanned_barcode');
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        applyScannedBarcode(parsed);
+        localStorage.removeItem('last_scanned_barcode');
+    }
+
+    window.addEventListener('message', (e) => applyScannedBarcode(e.data));
+    window.addEventListener('focus', consumeStoredBarcode);
+
     if (openCameraButton) {
         openCameraButton.addEventListener('click', () => {
-            window.open("{% url 'camera_view' %}?field=purchase_barcode", "_blank", "width=800,height=600");
+            if (/Mobi|Android/i.test(navigator.userAgent)) {
+                window.location.href = "{% url 'camera_view' %}?field=purchase_barcode";
+            } else {
+                window.open("{% url 'camera_view' %}?field=purchase_barcode", "_blank", "width=800,height=600");
+            }
         });
     }
 
-    window.addEventListener('message', handleBarcodeMessage);
+    consumeStoredBarcode();
 });
 </script>
 {% endblock %}
