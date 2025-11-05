@@ -69,7 +69,6 @@
             const payload = { type: "barcode_scanned", value: code, field: targetField };
             let delivered = false;
 
-            // Try postMessage when window opened via window.open
             if (window.opener && !window.opener.closed) {
                 try {
                     window.opener.postMessage(payload, "*");
@@ -79,7 +78,6 @@
                 }
             }
 
-            // Fallback to localStorage when opener is not available (e.g. same tab)
             if (!delivered) {
                 try {
                     localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
@@ -88,26 +86,17 @@
                 }
             }
 
-            // Update UI to indicate success and stop the camera
-            updateStatus(`Barkod okundu: ${code}`, "success");
-            // Stop Quagga to release the camera
+            // Stop Quagga and close/navigate immediately without timeout
             Quagga.stop();
-
-            // Wait a moment so the user can see the success message, then close
-            setTimeout(() => {
-                if (window.opener && !window.opener.closed) {
-                    // Close the pop-up window
-                    window.close();
+            if (window.opener && !window.opener.closed) {
+                window.close();
+            } else {
+                if (window.history.length > 1) {
+                    window.history.back();
                 } else {
-                    // In the same tab, go back to the previous page if possible
-                    if (window.history.length > 1) {
-                        window.history.back();
-                    } else {
-                        // Fallback: return to product list if no history exists
-                        window.location.href = "{% url 'product_list' %}";
-                    }
+                    window.location.href = "{% url 'product_list' %}";
                 }
-            }, 1500);
+            }
         }
 
         /**

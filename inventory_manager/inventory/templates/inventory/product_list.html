@@ -153,6 +153,8 @@ document.addEventListener('DOMContentLoaded', function () {
     function handleBarcodePayload(payload) {
         if (payload && payload.type === 'barcode_scanned' && payload.field === 'product_search' && payload.value) {
             applyScannedBarcode(payload.value);
+            // Clear localStorage after applying the barcode
+            localStorage.removeItem('last_scanned_barcode');
         }
     }
 
@@ -163,14 +165,16 @@ document.addEventListener('DOMContentLoaded', function () {
     function consumeStoredBarcode() {
         try {
             const stored = localStorage.getItem('last_scanned_barcode');
-            if (!stored) return;
-            const parsed = JSON.parse(stored);
-            handleBarcodePayload(parsed);
-            localStorage.removeItem('last_scanned_barcode');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                handleBarcodePayload(parsed);
+            }
         } catch (err) {
             console.error('Kaydedilen barkod okunurken hata oluştu:', err);
         }
     }
+
+    setInterval(consumeStoredBarcode, 100);
 
     // Search input live filtering.
     searchInput.addEventListener('input', () => {
