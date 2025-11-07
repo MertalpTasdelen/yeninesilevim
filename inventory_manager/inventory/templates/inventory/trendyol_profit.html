@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}
+Trendyol Kar Raporu
+{% endblock %}
+
+{% block content %}
+<h1>Trendyol Kar Raporu</h1>
+<form method="get" class="row g-3">
+    <div class="col-md-4">
+        <label for="start_date" class="form-label">Başlangıç Tarihi</label>
+        <input type="date" class="form-control" name="start_date" id="start_date" value="{{ start_date }}">
+    </div>
+    <div class="col-md-4">
+        <label for="end_date" class="form-label">Bitiş Tarihi</label>
+        <input type="date" class="form-control" name="end_date" id="end_date" value="{{ end_date }}">
+    </div>
+    <div class="col-md-4 align-self-end">
+        <button type="submit" class="btn btn-primary">Hesapla</button>
+    </div>
+</form>
+
+{% if results %}
+<table class="table table-striped mt-4">
+    <thead>
+        <tr>
+            <th>Barkod</th>
+            <th>Sipariş No</th>
+            <th>Satıcı Geliri (sellerRevenue)</th>
+            <th>Alış Fiyatı</th>
+            <th>Net Kar</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in results %}
+        <tr>
+            <td>{{ row.barcode }}</td>
+            <td>{{ row.orderNumber }}</td>
+            <td>{{ row.sellerRevenue }}</td>
+            <td>{{ row.purchasePrice }}</td>
+            <td>{{ row.profit }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% elif start_date and end_date %}
+<p class="mt-4">Belirtilen tarih aralığında kayıt bulunamadı.</p>
+{% endif %}
+{% endblock %}

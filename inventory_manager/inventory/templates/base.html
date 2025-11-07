@@ -57,6 +57,10 @@
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'profit_calculator_list' %}">Kâr Kayıtları</a>
                     </li>
+                    <li class="nav-item">
+                        <!-- New nav item for Trendyol profit page; disabled for unauthenticated users -->
+                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" href="{% url 'trendyol_profit' %}">Trendyol Kâr</a>
+                    </li>
                 </ul>
             </div>
         </div>

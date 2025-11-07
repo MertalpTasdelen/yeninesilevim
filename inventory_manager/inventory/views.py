@@ -8,10 +8,15 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
+# Import Trendyol integration utilities and datetime for timestamp conversion
+from .trendyol_integration import fetch_settlements, calculate_profit_for_settlements
+import datetime
+
 from pyzbar.pyzbar import decode
 from PIL import Image
 import base64
 from io import BytesIO
+
 
 def _require_login(request):
     """
@@ -266,8 +271,63 @@ def delete_profit_calculation(request, id):
     return JsonResponse({'success': False}, status=400)
 
 
+def trendyol_profit(request):
+    """
+    Retrieve settlement records from Trendyol for a given date range,
+    match them with local products and compute net profit.
+    Only authenticated users can access this view.
+    """
+    # Enforce authentication
+    resp = _require_login(request)
+    if resp:
+        return resp
+    results = []
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    if start_date and end_date:
+        try:
+            # Parse input dates (YYYY-MM-DD) and convert to Unix timestamps in ms.
+            start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
+            start_ts = int(start_dt.timestamp() * 1000)
+            # Include full end date by extending to end of day.
+            end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
+  
+            seller_id = "XXXXXXX"
+            api_key = "XX"
+            api_secret = "XX"
+            store_front_code = "TRENDYOLTR"
+            user_agent = f"{seller_id}-XX"
+            response_data = fetch_settlements(
+                seller_id=seller_id,
+                api_key=api_key,
+                api_secret=api_secret,
+                start_date=start_ts,
+                end_date=end_ts,
+                transaction_type="Sale",
+                page=0,
+                size=500,
+                store_front_code=store_front_code,
+                user_agent=user_agent
+            )
+            content = []
+            if isinstance(response_data, dict):
+                # Trendyol returns settlement list under `content`
+                content = response_data.get('content', []) or []
+            results = calculate_profit_for_settlements(content)
+        except Exception:
+            # Suppress errors and leave results empty
+            results = []
+    context = {
+        'results': results,
+        'start_date': start_date,
+        'end_date': end_date,
+    }
+    return render(request, 'inventory/trendyol_profit.html', context)
+
+
 def login_view(request):
-    LOGIN_PASSWORD = '123456'
+    LOGIN_PASSWORD = '1111'
     if request.method == 'POST':
         password = request.POST.get('password')
         if password == LOGIN_PASSWORD:
