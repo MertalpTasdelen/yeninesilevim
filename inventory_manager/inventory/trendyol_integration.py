@@ -145,36 +145,31 @@ def fetch_deduction_invoices(
     user_agent: Optional[str] = None,
     base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
 ) -> List[Dict[str, Any]]:
-    """Fetch deduction invoices from Trendyol.
+    """Fetch deduction invoices from Trendyol using otherfinancials endpoint."""
+    
+    url = f"{base_url}/{seller_id}/otherfinancials"
+    
+    params = {
+        "startDate": start_date,
+        "endDate": end_date,
+        "transactionType": "DeductionInvoices",
+        "page": page,
+        "size": size,
+    }
 
-    This function wraps :func:`fetch_settlements` to request the
-    ``DeductionInvoices`` transaction type.  It returns the ``content``
-    list from the response, or an empty list if the response does not
-    conform to the expected structure.
+    headers = {
+        "User-Agent": user_agent or f"{seller_id}-SelfIntegration",
+        "storeFrontCode": store_front_code,
+        "Content-Type": "application/json",
+    }
 
-    Parameters are identical to :func:`fetch_settlements` except that
-    ``transaction_type`` is fixed internally.
-
-    Returns
-    -------
-    list of dict
-        A list of deduction invoice records.
-    """
-    response_data = fetch_settlements(
-        seller_id=seller_id,
-        api_key=api_key,
-        api_secret=api_secret,
-        start_date=start_date,
-        end_date=end_date,
-        transaction_type="DeductionInvoices",
-        page=page,
-        size=size,
-        store_front_code=store_front_code,
-        user_agent=user_agent,
-        base_url=base_url,
-    )
-    if isinstance(response_data, dict):
-        return response_data.get("content", []) or []
+    auth = HTTPBasicAuth(api_key, api_secret)
+    response = requests.get(url, params=params, headers=headers, auth=auth, timeout=30)
+    response.raise_for_status()
+    
+    data = response.json()
+    if isinstance(data, dict):
+        return data.get("content", []) or []
     return []
 
 
