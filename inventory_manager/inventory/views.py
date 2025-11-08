@@ -7,6 +7,9 @@ from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Import Trendyol integration utilities and datetime for timestamp conversion
 from .trendyol_integration import (
@@ -294,11 +297,11 @@ def trendyol_profit(request):
             end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
             print(f"Tarih aralığı: {start_date} - {end_date}")
 
-            seller_id = "973871"
-            api_key = "uxKAGmeBsn35z1Pkyszs"
-            api_secret = "A8eBLEct9tABS4Q5UB30"
+            seller_id = "XXX"
+            api_key = "XXX"
+            api_secret = "XXX"
             store_front_code = "TRENDYOLTR"
-            user_agent = f"{seller_id}-OzlemFiratTasdelen"
+            user_agent = f"{seller_id}-XXX"
 
             print("Trendyol satış kayıtları çekiliyor...")
             sales_data = fetch_settlements(
@@ -324,14 +327,14 @@ def trendyol_profit(request):
                 start_date=start_ts,
                 end_date=end_ts,
                 page=0,
-                size=500,
+                size=1000,
                 store_front_code=store_front_code,
                 user_agent=user_agent,
             )
 
-            print(f"Bulunan kargo ücreti kayıtları: {len(shipping_fees)}")
+            logger.info(f"Bulunan kargo ücreti kayıtları: {len(shipping_fees)}")
             results = calculate_profit_with_shipping(sales_content, shipping_fees)
-            print(f"Hesaplanan toplam sonuç: {len(results)}")
+            logger.info(f"Hesaplanan toplam sonuç: {len(results)}")
 
         except Exception as e:
             print("Hata [trendyol_profit]:", e)
