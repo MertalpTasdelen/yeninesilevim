@@ -28,6 +28,7 @@ Trendyol Kar Raporu
             <th>Sipariş No</th>
             <th>Satıcı Geliri (sellerRevenue)</th>
             <th>Alış Fiyatı</th>
+            <th>Kargo Ücreti</th>
             <th>Net Kar</th>
         </tr>
     </thead>
@@ -38,7 +39,8 @@ Trendyol Kar Raporu
             <td>{{ row.orderNumber }}</td>
             <td>{{ row.sellerRevenue }}</td>
             <td>{{ row.purchasePrice }}</td>
-            <td>{{ row.profit }}</td>
+            <td>{{ row.shippingFee }}</td>
+            <td>{{ row.netProfit }}</td>
         </tr>
         {% endfor %}
     </tbody>

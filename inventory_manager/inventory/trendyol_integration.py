@@ -17,7 +17,7 @@ credentials to version control.  Instead, provide them at runtime
 via environment variables or Django settings.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -115,6 +115,292 @@ def fetch_settlements(
     # Raise an exception for non‑2xx status codes
     response.raise_for_status()
     return response.json()
+
+
+# -----------------------------------------------------------------------------
+# Additional utilities for pulling deduction invoices and cargo invoice items
+#
+# Trendyol issues separate invoices for shipping costs (kargo faturası).  These
+# invoices are not returned alongside sales settlements; instead, you must
+# request the ``DeductionInvoices`` transaction type via the Current Account
+# Statement API to obtain the invoice serial numbers.  According to the
+# documentation, any record in the ``DeductionInvoices`` response whose
+# ``transactionType`` is ``"Kargo Faturası"`` or ``"Kargo Fatura"`` has an
+# ``Id`` field that corresponds to the ``invoiceSerialNumber`` for that cargo
+# invoice【386676864912269†L54-L59】.  Once you have the serial number, you can
+# call the cargo‑invoice endpoint to retrieve detailed line items, including
+# shipment package type and amount【386676864912269†L61-L96】.  The helper
+# functions below encapsulate these steps.
+
+def fetch_deduction_invoices(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    start_date: int,
+    end_date: int,
+    page: int = 0,
+    size: int = 500,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> List[Dict[str, Any]]:
+    """Fetch deduction invoices from Trendyol.
+
+    This function wraps :func:`fetch_settlements` to request the
+    ``DeductionInvoices`` transaction type.  It returns the ``content``
+    list from the response, or an empty list if the response does not
+    conform to the expected structure.
+
+    Parameters are identical to :func:`fetch_settlements` except that
+    ``transaction_type`` is fixed internally.
+
+    Returns
+    -------
+    list of dict
+        A list of deduction invoice records.
+    """
+    response_data = fetch_settlements(
+        seller_id=seller_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        start_date=start_date,
+        end_date=end_date,
+        transaction_type="DeductionInvoices",
+        page=page,
+        size=size,
+        store_front_code=store_front_code,
+        user_agent=user_agent,
+        base_url=base_url,
+    )
+    if isinstance(response_data, dict):
+        return response_data.get("content", []) or []
+    return []
+
+
+def extract_cargo_invoice_numbers(deductions: List[Dict[str, Any]]) -> List[str]:
+    """Extract cargo invoice serial numbers from deduction records.
+
+    Iterates over the deduction invoice records and collects the ``Id`` (or
+    ``id``) field for those entries whose ``transactionType`` is either
+    ``"Kargo Faturası"`` or ``"Kargo Fatura"``【386676864912269†L54-L59】.
+
+    Parameters
+    ----------
+    deductions : list of dict
+        Records returned by :func:`fetch_deduction_invoices`.
+
+    Returns
+    -------
+    list of str
+        A list of invoice serial numbers as strings.
+    """
+    invoice_numbers: List[str] = []
+    for record in deductions:
+        ttype = record.get("transactionType") or record.get("transaction_type")
+        if ttype in {"Kargo Faturası", "Kargo Fatura"}:
+            # some responses use 'Id', others 'id'; attempt both
+            invoice_id = record.get("Id") or record.get("id")
+            if invoice_id is not None:
+                invoice_numbers.append(str(invoice_id))
+    return invoice_numbers
+
+
+def fetch_cargo_invoice_items(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    invoice_serial_number: str,
+    page: int = 0,
+    size: int = 500,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> List[Dict[str, Any]]:
+    """Fetch items for a specific cargo invoice.
+
+    Given an ``invoice_serial_number``, this function calls the Trendyol
+    cargo invoice items endpoint and returns the ``content`` list of
+    line items【386676864912269†L61-L96】.
+
+    Parameters
+    ----------
+    seller_id, api_key, api_secret : str
+        Credentials and seller identifier required for Basic Auth.
+    invoice_serial_number : str
+        Serial number of the cargo invoice as obtained from
+        :func:`extract_cargo_invoice_numbers`.
+    page, size : int, optional
+        Pagination parameters.  Defaults align with other API calls.
+    store_front_code : str, optional
+        The storefront code.  Included for consistency; not required
+        by the cargo invoice endpoint but accepted in practice.
+    user_agent : str, optional
+        Custom user agent header.  If not provided a default of
+        ``"{seller_id}-SelfIntegration"`` is used.
+    base_url : str, optional
+        Base path for Trendyol finance integration.  Override only if
+        Trendyol changes domains.
+
+    Returns
+    -------
+    list of dict
+        List of cargo invoice item dictionaries.
+    """
+    # Build the cargo invoice endpoint URL
+    url = f"{base_url}/{seller_id}/cargo-invoice/{invoice_serial_number}/items"
+    params = {
+        "page": page,
+        "size": size,
+    }
+    headers = {
+        "User-Agent": user_agent or f"{seller_id}-SelfIntegration",
+        "storeFrontCode": store_front_code,
+        "Content-Type": "application/json",
+    }
+    auth = HTTPBasicAuth(api_key, api_secret)
+    response = requests.get(url, params=params, headers=headers, auth=auth, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    if isinstance(data, dict):
+        return data.get("content", []) or []
+    return []
+
+
+def build_shipping_fee_map(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    start_date: int,
+    end_date: int,
+    page: int = 0,
+    size: int = 500,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> Dict[str, float]:
+    """Retrieve cargo invoices and aggregate shipping fees per order.
+
+    This helper orchestrates the entire flow of fetching deduction invoices,
+    extracting cargo invoice serial numbers, fetching the corresponding cargo
+    invoice items, and summing the amounts for shipment package type
+    ``"Gönderi Kargo Bedeli"`` by order number【386676864912269†L61-L96】.
+
+    Parameters
+    ----------
+    seller_id, api_key, api_secret : str
+        Credentials for Trendyol API.
+    start_date, end_date : int
+        Time range in milliseconds (Unix epoch) to search for deduction
+        invoices.  The same timestamps used for settlements should be
+        provided to ensure matching orders.
+    page, size, store_front_code, user_agent, base_url
+        Optional parameters forwarded to the underlying fetch functions.
+
+    Returns
+    -------
+    dict
+        A mapping from order numbers to their total shipping fee (float).
+    """
+    shipping_fees: Dict[str, float] = {}
+    deductions = fetch_deduction_invoices(
+        seller_id=seller_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        size=size,
+        store_front_code=store_front_code,
+        user_agent=user_agent,
+        base_url=base_url,
+    )
+    invoice_numbers = extract_cargo_invoice_numbers(deductions)
+    for inv in invoice_numbers:
+        items = fetch_cargo_invoice_items(
+            seller_id=seller_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            invoice_serial_number=inv,
+            page=page,
+            size=size,
+            store_front_code=store_front_code,
+            user_agent=user_agent,
+            base_url=base_url,
+        )
+        for item in items:
+            # We're interested only in shipping charges of type "Gönderi Kargo Bedeli"
+            if item.get("shipmentPackageType") == "Gönderi Kargo Bedeli":
+                order_no = item.get("orderNumber")
+                amt = item.get("amount")
+                if order_no and amt is not None:
+                    shipping_fees[order_no] = shipping_fees.get(order_no, 0.0) + float(amt)
+    return shipping_fees
+
+
+def calculate_profit_with_shipping(
+    settlements: List[Dict[str, Any]],
+    shipping_fees: Dict[str, float]
+) -> List[Dict[str, Any]]:
+    """Compute net profit after subtracting purchase and shipping costs.
+
+    Extends :func:`calculate_profit_for_settlements` by allowing a
+    precomputed mapping of shipping fees keyed by ``orderNumber``.  For each
+    settlement record, this function subtracts both the product's purchase
+    price and any associated shipping fee to calculate a final net profit.
+    If a product cannot be found in the local database, the purchase price
+    and shipping fee are assumed to be zero and the sale is still included
+    in the results.
+
+    Parameters
+    ----------
+    settlements : list of dict
+        Records returned from the settlements API (``content`` list).
+    shipping_fees : dict
+        Mapping from order number to shipping fee (float) built by
+        :func:`build_shipping_fee_map`.
+
+    Returns
+    -------
+    list of dict
+        A list of dictionaries with additional fields ``purchasePrice``,
+        ``shippingFee`` and ``netProfit`` alongside the standard settlement fields.
+    """
+    results: List[Dict[str, Any]] = []
+    for record in settlements:
+        barcode = record.get("barcode")
+        seller_revenue = record.get("sellerRevenue")
+        if not barcode or seller_revenue is None:
+            # Skip entries without a barcode or revenue field
+            continue
+        # Default values if the product is not present in our database
+        purchase_price: float = 0.0
+        shipping_fee: float = 0.0
+        product_found = False
+        try:
+            product = Product.objects.get(barcode=barcode)
+            purchase_price = float(product.purchase_price)
+            product_found = True
+        except Product.DoesNotExist:
+            product_found = False
+        order_no = record.get("orderNumber")
+        if product_found:
+            # Only apply shipping fee when a product match exists
+            shipping_fee = shipping_fees.get(order_no, 0.0)
+        # Profit before shipping
+        base_profit = float(seller_revenue) - purchase_price
+        net_profit = base_profit - shipping_fee
+        results.append({
+            "barcode": barcode,
+            "orderNumber": order_no,
+            "sellerRevenue": seller_revenue,
+            "purchasePrice": purchase_price,
+            "shippingFee": shipping_fee,
+            "netProfit": net_profit,
+        })
+    return results
 
 
 def calculate_profit_for_settlements(settlements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

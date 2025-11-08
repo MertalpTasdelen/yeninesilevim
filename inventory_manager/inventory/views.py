@@ -9,7 +9,12 @@ from django.views.decorators.http import require_POST
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 # Import Trendyol integration utilities and datetime for timestamp conversion
-from .trendyol_integration import fetch_settlements, calculate_profit_for_settlements
+from .trendyol_integration import (
+    fetch_settlements,
+    calculate_profit_for_settlements,
+    build_shipping_fee_map,
+    calculate_profit_with_shipping,
+)
 import datetime
 
 from pyzbar.pyzbar import decode
@@ -272,33 +277,31 @@ def delete_profit_calculation(request, id):
 
 
 def trendyol_profit(request):
-    """
-    Retrieve settlement records from Trendyol for a given date range,
-    match them with local products and compute net profit.
-    Only authenticated users can access this view.
-    """
-    # Enforce authentication
     resp = _require_login(request)
     if resp:
         return resp
+
     results = []
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
+
     if start_date and end_date:
         try:
-            # Parse input dates (YYYY-MM-DD) and convert to Unix timestamps in ms.
+            import traceback
             start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
             start_ts = int(start_dt.timestamp() * 1000)
-            # Include full end date by extending to end of day.
             end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
-  
-            seller_id = "XXXXXXX"
-            api_key = "XX"
-            api_secret = "XX"
+            print(f"Tarih aralığı: {start_date} - {end_date}")
+
+            seller_id = "XXX"
+            api_key = "XXX"
+            api_secret = "XXX"
             store_front_code = "TRENDYOLTR"
-            user_agent = f"{seller_id}-XX"
-            response_data = fetch_settlements(
+            user_agent = f"{seller_id}-XXX"
+
+            print("Trendyol satış kayıtları çekiliyor...")
+            sales_data = fetch_settlements(
                 seller_id=seller_id,
                 api_key=api_key,
                 api_secret=api_secret,
@@ -308,26 +311,43 @@ def trendyol_profit(request):
                 page=0,
                 size=500,
                 store_front_code=store_front_code,
-                user_agent=user_agent
+                user_agent=user_agent,
             )
-            content = []
-            if isinstance(response_data, dict):
-                # Trendyol returns settlement list under `content`
-                content = response_data.get('content', []) or []
-            results = calculate_profit_for_settlements(content)
-        except Exception:
-            # Suppress errors and leave results empty
+            sales_content = sales_data.get("content", []) if isinstance(sales_data, dict) else []
+            print(f"Toplam satış kaydı: {len(sales_content)}")
+
+            print("Kargo ücretleri çekiliyor...")
+            shipping_fees = build_shipping_fee_map(
+                seller_id=seller_id,
+                api_key=api_key,
+                api_secret=api_secret,
+                start_date=start_ts,
+                end_date=end_ts,
+                page=0,
+                size=500,
+                store_front_code=store_front_code,
+                user_agent=user_agent,
+            )
+
+            print(f"Bulunan kargo ücreti kayıtları: {len(shipping_fees)}")
+            results = calculate_profit_with_shipping(sales_content, shipping_fees)
+            print(f"Hesaplanan toplam sonuç: {len(results)}")
+
+        except Exception as e:
+            print("Hata [trendyol_profit]:", e)
+            traceback.print_exc()
             results = []
-    context = {
-        'results': results,
-        'start_date': start_date,
-        'end_date': end_date,
-    }
+
+    else:
+        print("Tarih aralığı seçilmemiş.")
+
+    context = {'results': results, 'start_date': start_date, 'end_date': end_date}
+    print(f"📊 Sayfa render ediliyor, sonuç sayısı: {len(results)}")
     return render(request, 'inventory/trendyol_profit.html', context)
 
 
 def login_view(request):
-    LOGIN_PASSWORD = '1111'
+    LOGIN_PASSWORD = '123456'
     if request.method == 'POST':
         password = request.POST.get('password')
         if password == LOGIN_PASSWORD:
