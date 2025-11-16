@@ -225,91 +225,120 @@ def build_shipping_fee_map(
     4. Dönüşte 'shipmentPackageType' == 'Gönderi Kargo Bedeli' olan
        satırlardaki 'orderNumber' ve 'amount' alanları eşleştirilir.
     5. Aynı sipariş birden fazla satıra sahipse amount toplanır.
+    6. Bütün sayfalar işlenene kadar döngü devam eder.
     """
 
+    # Initialize the result dictionary
     shipping_fees: Dict[str, float] = {}
+
+    # Base URL for /otherfinancials endpoint
     url_financials = f"{base_url}/{seller_id}/otherfinancials"
 
-    # API parametreleri
-    params = {
-        "startDate": start_date,
-        "endDate": end_date,
-        "transactionType": "DeductionInvoices",
-        "page": page,
-        "size": size,
-    }
-
+    # Prepare common headers and auth once
     headers = {
         "User-Agent": user_agent or f"{seller_id}-Integration",
         "storeFrontCode": store_front_code,
         "Content-Type": "application/json",
     }
-
     auth = HTTPBasicAuth(api_key, api_secret)
 
     try:
-        logger.info(
-            "STEP 1: /otherfinancials endpoint'ine istek gönderiliyor...")
-        response = requests.get(
-            url_financials, params=params, headers=headers, auth=auth, timeout=30)
-        response.raise_for_status()
-        data = response.json()
+        logger.info("STEP 1: /otherfinancials endpoint'ine istek gönderilmeye başlanıyor...")
+        current_page: int = page
+        total_pages: Optional[int] = None
 
-        content = data.get("content", [])
-        logger.info(
-            f"STEP 2: /otherfinancials yanıtı alındı. Toplam kayıt sayısı: {len(content)}")
+        # Continue fetching pages until all pages are processed
+        while True:
+            # Set pagination parameters for this iteration
+            params = {
+                "startDate": start_date,
+                "endDate": end_date,
+                "transactionType": "DeductionInvoices",
+                "page": current_page,
+                "size": size,
+            }
 
-        # Kargo fatura tipine sahip kayıtları filtrele
-        cargo_invoices = [
-            item for item in content
-            if str(item.get("transactionType", "")).lower().replace("ı", "i") in ["kargo fatura", "kargo faturasi"]
-        ]
-        logger.info(
-            f"STEP 3: Kargo faturası olarak eşleşen kayıt sayısı: {len(cargo_invoices)}")
+            response = requests.get(
+                url_financials, params=params, headers=headers, auth=auth, timeout=30
+            )
+            response.raise_for_status()
+            data = response.json() or {}
 
-        # Her bir kargo faturası için detay çağrısı yap
-        for idx, invoice in enumerate(cargo_invoices, start=1):
-            invoice_id = invoice.get("id")
-            if not invoice_id:
-                logger.warning(
-                    f"STEP 3.{idx}: Geçersiz id tespit edildi, kayıt atlandı.")
-                continue
+            # Determine total pages from response if available
+            if total_pages is None:
+                total_pages = data.get("totalPages")
 
-            url_cargo = f"{base_url}/{seller_id}/cargo-invoice/{invoice_id}/items"
-            try:
+            content = data.get("content", []) or []
+            logger.info(
+                f"STEP 2.{current_page}: /otherfinancials yanıtı alındı. Sayfa başına kayıt sayısı: {len(content)}"
+            )
+
+            # Filter records with transactionType matching cargo invoice names
+            cargo_invoices = [
+                item
+                for item in content
+                if str(item.get("transactionType", "")).lower().replace("ı", "i")
+                in ["kargo fatura", "kargo faturasi"]
+            ]
+            logger.info(
+                f"STEP 3.{current_page}: Bu sayfada kargo faturası olarak eşleşen kayıt sayısı: {len(cargo_invoices)}"
+            )
+
+            # For each cargo invoice, fetch its detail items
+            for idx, invoice in enumerate(cargo_invoices, start=1):
+                invoice_id = invoice.get("id")
+                if not invoice_id:
+                    logger.warning(
+                        f"STEP 3.{current_page}.{idx}: Geçersiz id tespit edildi, kayıt atlandı."
+                    )
+                    continue
+                url_cargo = f"{base_url}/{seller_id}/cargo-invoice/{invoice_id}/items"
+                try:
+                    logger.info(
+                        f"STEP 4.{current_page}.{idx}: Kargo faturası detayları çekiliyor -> ID: {invoice_id}"
+                    )
+                    resp_cargo = requests.get(
+                        url_cargo, headers=headers, auth=auth, timeout=30
+                    )
+                    resp_cargo.raise_for_status()
+                    cargo_json = resp_cargo.json() or {}
+                    cargo_items = cargo_json.get("content", []) or []
+
+                    # Filter for 'Gönderi Kargo Bedeli' items and accumulate amounts per order
+                    for item in cargo_items:
+                        if item.get("shipmentPackageType") == "Gönderi Kargo Bedeli":
+                            order_no = item.get("orderNumber")
+                            amount = item.get("amount")
+                            if not order_no or amount is None:
+                                continue
+                            current_amount = shipping_fees.get(order_no, 0.0)
+                            shipping_fees[order_no] = round(current_amount + float(amount), 2)
+
+                    logger.info(
+                        f"STEP 5.{current_page}.{idx}: {invoice_id} için {len(cargo_items)} adet item işlendi."
+                    )
+                except requests.HTTPError as e:
+                    logger.error(
+                        f"STEP 4.{current_page}.{idx} HTTP hatası: {str(e)} | ID: {invoice_id}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"STEP 4.{current_page}.{idx} beklenmeyen hata: {str(e)} | ID: {invoice_id}"
+                    )
+
+            # Determine if we should fetch next page
+            current_page += 1
+            # Break if content is empty or we have processed all pages
+            if not content:
                 logger.info(
-                    f"STEP 4.{idx}: Kargo faturası detayları çekiliyor -> ID: {invoice_id}")
-                resp_cargo = requests.get(
-                    url_cargo, headers=headers, auth=auth, timeout=30)
-                resp_cargo.raise_for_status()
-                cargo_json = resp_cargo.json()
-                cargo_items = cargo_json.get("content", [])
-
-                # Gönderi Kargo Bedeli tiplerini filtrele
-                for item in cargo_items:
-                    if item.get("shipmentPackageType") == "Gönderi Kargo Bedeli":
-                        order_no = item.get("orderNumber")
-                        amount = item.get("amount")
-
-                        if not order_no or amount is None:
-                            continue
-
-                        current_amount = shipping_fees.get(order_no, 0.0)
-                        shipping_fees[order_no] = round(
-                            current_amount + float(amount), 2)
-
+                    f"STEP 6: Daha fazla kayıt yok. Toplam {len(shipping_fees)} sipariş numarası için kargo ücreti toplandı."
+                )
+                break
+            if total_pages is not None and current_page >= total_pages:
                 logger.info(
-                    f"STEP 5.{idx}: {invoice_id} için {len(cargo_items)} adet item işlendi.")
-
-            except requests.HTTPError as e:
-                logger.error(
-                    f"STEP 4.{idx} HTTP hatası: {str(e)} | ID: {invoice_id}")
-            except Exception as e:
-                logger.error(
-                    f"STEP 4.{idx} beklenmeyen hata: {str(e)} | ID: {invoice_id}")
-
-        logger.info(
-            f"STEP 6: Toplam {len(shipping_fees)} sipariş numarası için kargo ücreti eşleşti.")
+                    f"STEP 6: Son sayfa işlendi. Toplam {len(shipping_fees)} sipariş numarası için kargo ücreti toplandı."
+                )
+                break
 
     except requests.HTTPError as e:
         logger.error(f"HTTP hatası (/otherfinancials): {str(e)}")

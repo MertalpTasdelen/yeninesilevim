@@ -297,11 +297,11 @@ def trendyol_profit(request):
             end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
             print(f"Tarih aralığı: {start_date} - {end_date}")
 
-            seller_id = "XXX"
-            api_key = "XXX"
-            api_secret = "XXX"
+            seller_id = "973871"
+            api_key = "uxKAGmeBsn35z1Pkyszs"
+            api_secret = "A8eBLEct9tABS4Q5UB30"
             store_front_code = "TRENDYOLTR"
-            user_agent = f"{seller_id}-XXX"
+            user_agent = f"{seller_id}-OzlemFiratTasdelen"
 
             print("Trendyol satış kayıtları çekiliyor...")
             sales_data = fetch_settlements(
@@ -325,11 +325,7 @@ def trendyol_profit(request):
                 api_key=api_key,
                 api_secret=api_secret,
                 start_date=start_ts,
-                end_date=end_ts,
-                page=0,
-                size=1000,
-                store_front_code=store_front_code,
-                user_agent=user_agent,
+                end_date=end_ts 
             )
 
             logger.info(f"Bulunan kargo ücreti kayıtları: {len(shipping_fees)}")
