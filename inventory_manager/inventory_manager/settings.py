@@ -146,12 +146,10 @@ LOGGING = {
     },
     
     'handlers': {
-        # 1️⃣ Terminal (journalctl ve systemd)
         'console': {
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        # 2️⃣ Dosya logu
         'file': {
             'class': 'logging.FileHandler',
             'filename': '/var/log/django/app.log',

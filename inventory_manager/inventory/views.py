@@ -1,81 +1,44 @@
-from django.shortcuts import render, get_object_or_404, redirect
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.core.paginator import Paginator
+from django.views.decorators.http import require_http_methods
 from .models import Product, ProfitCalculator
 from .forms import ProductForm
-from django.http import JsonResponse
-from django.db.models import Q
-from django.template.loader import render_to_string
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from .trendyol_integration import (
+    fetch_all_sales,
+    create_15day_periods,
+    fetch_all_cargo_from_periods,
+    match_sales_with_cargo,
+)
 import logging
+import traceback
+import datetime
 
 logger = logging.getLogger(__name__)
 
-# Import Trendyol integration utilities and datetime for timestamp conversion
-from .trendyol_integration import (
-    fetch_settlements,
-    calculate_profit_for_settlements,
-    build_shipping_fee_map,
-    calculate_profit_with_shipping,
-)
-import datetime
-
-from pyzbar.pyzbar import decode
-from PIL import Image
-import base64
-from io import BytesIO
-
 
 def _require_login(request):
-    """
-    Helper function to enforce that a user has logged in via the custom
-    password prompt.  If the session flag ``is_logged_in`` is not set, the
-    caller will be redirected to the login page.  Views that mutate data or
-    expose sensitive information should call this before proceeding.
-    """
-    if not request.session.get('is_logged_in'):
-        # Redirect unauthenticated users to the login page.  Note: we avoid
-        # storing the current URL for simplicity, but Django's built-in
-        # authentication framework can provide this functionality if needed.
+    if not request.session.get('is_logged_in', False):
         return redirect('login')
     return None
 
 
-def ajax_search(request):
-    products = Product.objects.all()
-    page = request.GET.get('page', 1)
-    paginator = Paginator(products, 12)  # 12 products per page
-
-    try:
-        products = paginator.page(page)
-    except PageNotAnInteger:
-        products = paginator.page(1)
-    except EmptyPage:
-        products = paginator.page(paginator.num_pages)
-
-    context = {
-        'page_obj': products,
-        'request': request,  # provide request for session access in templates
-    }
-
-    return render(request, 'inventory/product_list_results.html', context)
-
-
 def product_list(request):
-    query = request.GET.get('q')
-    sort_by = request.GET.get('sort_by', 'id')
-    page_number = request.GET.get('page', 1)
-
+    query = request.GET.get('q', '')
+    sort_by = request.GET.get('sort_by', '')
+    page = request.GET.get('page', 1)
+    
+    products = Product.objects.all()
+    
     if query:
-        products = Product.objects.filter(
-            Q(name__icontains=query) |
-            Q(barcode__icontains=query) |
-            Q(purchase_barcode__icontains=query)
+        products = products.filter(
+            name__icontains=query
+        ) | products.filter(
+            barcode__icontains=query
+        ) | products.filter(
+            purchase_barcode__icontains=query
         )
-    else:
-        products = Product.objects.all()
-
-    # Sorting logic
+    
     if sort_by == 'stock_desc':
         products = products.order_by('-stock')
     elif sort_by == 'stock_asc':
@@ -85,34 +48,42 @@ def product_list(request):
     elif sort_by == 'selling_price_asc':
         products = products.order_by('selling_price')
     else:
-        products = products.order_by('id')
-
+        products = products.order_by('-created_at')
+    
     paginator = Paginator(products, 12)
-    page_obj = paginator.get_page(page_number)
-
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        html = render_to_string(
+    page_obj = paginator.get_page(page)
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        html = render(
+            request,
             'inventory/product_list_results.html',
-            {'page_obj': page_obj, 'request': request},
-            request=request
-        )
+            {'page_obj': page_obj}
+        ).content.decode()
         return JsonResponse({
             'html': html,
             'has_next': page_obj.has_next()
         })
-
-    return render(request, 'inventory/product_list.html', {
+    
+    context = {
         'page_obj': page_obj,
         'query': query,
-        'sort_by': sort_by
-    })
+        'sort_by': sort_by,
+    }
+    return render(request, 'inventory/product_list.html', context)
+
+
+def ajax_search(request):
+    query = request.GET.get('q', '')
+    products = Product.objects.filter(name__icontains=query)[:10]
+    results = [{'id': p.id, 'name': p.name, 'barcode': p.barcode} for p in products]
+    return JsonResponse(results, safe=False)
 
 
 def add_product(request):
-    # Require login before allowing product creation
     resp = _require_login(request)
     if resp:
         return resp
+    
     if request.method == 'POST':
         form = ProductForm(request.POST)
         if form.is_valid():
@@ -120,15 +91,17 @@ def add_product(request):
             return redirect('product_list')
     else:
         form = ProductForm()
+    
     return render(request, 'inventory/product_form.html', {'form': form})
 
 
 def edit_product(request, id):
-    # Require login to edit
     resp = _require_login(request)
     if resp:
         return resp
+    
     product = get_object_or_404(Product, id=id)
+    
     if request.method == 'POST':
         form = ProductForm(request.POST, instance=product)
         if form.is_valid():
@@ -136,147 +109,160 @@ def edit_product(request, id):
             return redirect('product_list')
     else:
         form = ProductForm(instance=product)
+    
     return render(request, 'inventory/product_form.html', {'form': form})
 
 
-@require_POST
 def delete_product(request, id):
-    # Only allow deletion when logged in
     resp = _require_login(request)
     if resp:
         return resp
+    
     product = get_object_or_404(Product, id=id)
     product.delete()
     return redirect('product_list')
 
 
-@require_POST
-def adjust_stock(request, id, amount):
-    # Protect stock modifications from unauthenticated access
-    resp = _require_login(request)
-    if resp:
-        return resp
-    product = get_object_or_404(Product, id=id)
-    product.stock = max(product.stock + int(amount), 0)
-    product.save()
-    # If the request comes via AJAX, return the new stock count as JSON so
-    # the client-side script can update the page without a full reload.
-    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return JsonResponse({'stock': product.stock})
-    return redirect('product_list')
-
-
 def camera_view(request):
-    return render(request, 'inventory/camera_view.html')
+    field = request.GET.get('field', 'product_search')
+    return render(request, 'inventory/camera_view.html', {'field': field})
 
 
 def scan_barcode(request):
-    if request.method == 'POST':
-        try:
-            image_data = request.json().get('image')
-            image_data = image_data.split(",")[1]
-            image_bytes = BytesIO(base64.b64decode(image_data))
-            image = Image.open(image_bytes)
-            decoded_objects = decode(image)
-            if decoded_objects:
-                barcode_data = decoded_objects[0].data.decode('utf-8')
-                return JsonResponse({'message': f'Barcode data: {barcode_data}'})
-            else:
-                return JsonResponse({'message': 'No barcode detected'})
-        except Exception as e:
-            return JsonResponse({'message': f'Error: {str(e)}'})
-    return JsonResponse({'message': 'Invalid request'})
+    barcode = request.POST.get('barcode', '')
+    field = request.POST.get('field', 'product_search')
+    
+    if barcode:
+        return JsonResponse({
+            'success': True,
+            'barcode': barcode,
+            'field': field
+        })
+    return JsonResponse({'success': False})
 
 
 def profit_calculator(request):
-    # This view is used to calculate profit on a single item.  It accepts
-    # barcode, selling_price and commution via query parameters to pre-fill
-    # the form.  Access to the form itself does not expose sensitive
-    # business information, so no login check is required.
-    barcode = request.GET.get('barcode')
-    selling_price = request.GET.get('selling_price')
-    commution = request.GET.get('commution')
+    barcode = request.GET.get('barcode', '')
+    selling_price = request.GET.get('selling_price', '')
+    commution = request.GET.get('commution', '')
+    
+    product = None
+    if barcode:
+        try:
+            product = Product.objects.get(barcode=barcode)
+        except Product.DoesNotExist:
+            pass
+    
     context = {
         'barcode': barcode,
         'selling_price': selling_price,
         'commution': commution,
+        'product': product,
     }
     return render(request, 'inventory/profit_calculator.html', context)
 
 
-@csrf_exempt
 def save_profit_calculation(request):
-    # Save a profit calculation to the database.  This does not reveal
-    # sensitive inventory details, but it writes to the database.  Require
-    # login before persisting.
-    resp = _require_login(request)
-    if resp:
-        return resp
     if request.method == 'POST':
         barcode = request.POST.get('barcode')
-        selling_price = request.POST.get('selling_price')
-        commution = request.POST.get('commution')
-        purchase_cost = request.POST.get('purchase_cost')
-        shipping_cost = request.POST.get('shipping_cost')
-        packaging_cost = request.POST.get('packaging_cost')
-        other_costs = request.POST.get('other_costs')
-        vat_rate = request.POST.get('vat_rate')
-
-        commission_rate = float(commution) / 100
-        paid_commission = float(selling_price) * commission_rate
-        total_cost = float(purchase_cost) + float(shipping_cost) + float(packaging_cost) + float(other_costs) + paid_commission
-        paid_vat = (float(selling_price) * float(vat_rate) / 100) - (total_cost * float(vat_rate) / 100)
-        net_profit = float(selling_price) - total_cost - paid_vat - commission_rate
-        profit_margin = (net_profit / total_cost) * 100
-
-        ProfitCalculator.objects.create(
-            barcode=barcode,
-            selling_price=selling_price,
-            commution=commution,
-            purchase_cost=purchase_cost,
-            shipping_cost=shipping_cost,
-            packaging_cost=packaging_cost,
-            other_costs=other_costs,
-            vat_rate=vat_rate,
-            paid_commission=paid_commission,
-            paid_vat=paid_vat,
-            total_cost=total_cost,
-            net_profit=net_profit,
-            profit_margin=profit_margin
-        )
-
-        return redirect('profit_calculator')
-
-    return render(request, 'inventory/profit_calculator.html')
+        selling_price = float(request.POST.get('selling_price', 0))
+        commution = float(request.POST.get('commution', 0))
+        purchase_cost = float(request.POST.get('purchase_cost', 0))
+        shipping_cost = float(request.POST.get('shipping_cost', 0))
+        packaging_cost = float(request.POST.get('packaging_cost', 0))
+        other_costs = float(request.POST.get('other_costs', 0))
+        vat_rate = float(request.POST.get('vat_rate', 0))
+        
+        paid_commission = selling_price * (commution / 100)
+        total_cost = purchase_cost + shipping_cost + packaging_cost + other_costs + paid_commission
+        paid_vat = (selling_price * (vat_rate / 100)) - (total_cost * (vat_rate / 100))
+        net_profit = selling_price - total_cost - paid_vat
+        profit_margin = (net_profit / selling_price * 100) if selling_price > 0 else 0
+        
+        try:
+            profit = ProfitCalculator.objects.get(barcode=barcode)
+            profit.selling_price = selling_price
+            profit.commution = commution
+            profit.purchase_cost = purchase_cost
+            profit.shipping_cost = shipping_cost
+            profit.packaging_cost = packaging_cost
+            profit.other_costs = other_costs
+            profit.vat_rate = vat_rate
+            profit.paid_commission = paid_commission
+            profit.paid_vat = paid_vat
+            profit.total_cost = total_cost
+            profit.net_profit = net_profit
+            profit.profit_margin = profit_margin
+            profit.save()
+        except ProfitCalculator.DoesNotExist:
+            ProfitCalculator.objects.create(
+                barcode=barcode,
+                selling_price=selling_price,
+                commution=commution,
+                purchase_cost=purchase_cost,
+                shipping_cost=shipping_cost,
+                packaging_cost=packaging_cost,
+                other_costs=other_costs,
+                vat_rate=vat_rate,
+                paid_commission=paid_commission,
+                paid_vat=paid_vat,
+                total_cost=total_cost,
+                net_profit=net_profit,
+                profit_margin=profit_margin,
+            )
+        
+        return redirect('profit_calculator_list')
+    
+    return redirect('profit_calculator')
 
 
 def profit_calculator_list(request):
-    # Only logged-in users should see the detailed cost breakdowns stored in
-    # ProfitCalculator records.  Redirect unauthenticated users to the login
-    # page.
-    resp = _require_login(request)
-    if resp:
-        return resp
-    records = ProfitCalculator.objects.all()
-    return render(request, 'inventory/profit_calculator_list.html', {'records': records, 'request': request})
-
-
-def get_product_image(request):
-    barcode = request.GET.get('barcode')
-    product = get_object_or_404(Product, barcode=barcode)
-    return JsonResponse({'image_url': product.image_url})
+    records = ProfitCalculator.objects.all().order_by('-created_at')
+    paginator = Paginator(records, 10)
+    page_num = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_num)
+    
+    context = {'records': page_obj}
+    return render(request, 'inventory/profit_calculator_list.html', context)
 
 
 def delete_profit_calculation(request, id):
-    # Deletion of profit calculations is a destructive operation; require login
+    if request.method == 'DELETE':
+        try:
+            record = ProfitCalculator.objects.get(id=id)
+            record.delete()
+            return JsonResponse({'success': True})
+        except ProfitCalculator.DoesNotExist:
+            return JsonResponse({'success': False}, status=404)
+    
+    return JsonResponse({'success': False}, status=405)
+
+
+def get_product_image(request):
+    barcode = request.GET.get('barcode', '')
+    try:
+        product = Product.objects.get(barcode=barcode)
+        return JsonResponse({'image_url': product.image_url})
+    except Product.DoesNotExist:
+        return JsonResponse({'image_url': None})
+
+
+@require_http_methods(["POST"])
+def adjust_stock(request, id, amount):
     resp = _require_login(request)
     if resp:
-        return resp
-    if request.method == 'DELETE':
-        record = get_object_or_404(ProfitCalculator, id=id)
-        record.delete()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False}, status=400)
+        return JsonResponse({'success': False}, status=401)
+    
+    product = get_object_or_404(Product, id=id)
+    product.stock += int(amount)
+    if product.stock < 0:
+        product.stock = 0
+    product.save()
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'success': True, 'stock': product.stock})
+    
+    return redirect('product_list')
 
 
 def trendyol_profit(request):
@@ -290,71 +276,99 @@ def trendyol_profit(request):
 
     if start_date and end_date:
         try:
-            import traceback
             start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
-            start_ts = int(start_dt.timestamp() * 1000)
-            end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
-            print(f"Tarih aralığı: {start_date} - {end_date}")
-
-            seller_id = "973871"
-            api_key = "uxKAGmeBsn35z1Pkyszs"
-            api_secret = "A8eBLEct9tABS4Q5UB30"
+            
+            logger.info(f"\n{'='*70}")
+            logger.info(f"TRENDYOL KÂRI RAPORU İŞLEMİ BAŞLADI")
+            logger.info(f"{'='*70}")
+            logger.info(f"Seçilen Tarih Aralığı: {start_date} - {end_date}")
+            
+            seller_id = "XXXX"
+            api_key = "XXXXXX"
+            api_secret = "XXXXXX"
             store_front_code = "TRENDYOLTR"
             user_agent = f"{seller_id}-OzlemFiratTasdelen"
-
-            print("Trendyol satış kayıtları çekiliyor...")
-            sales_data = fetch_settlements(
+            
+            total_days = (end_dt - start_dt).days + 1
+            logger.info(f"Toplam Gün Sayısı: {total_days}")
+            
+            logger.info(f"\n{'='*70}")
+            logger.info(f"ADIM 1: TÜM SATIŞLAR ÇEKİLİYOR ({start_date} - {end_date})")
+            logger.info(f"{'='*70}")
+            
+            start_ts = int(start_dt.timestamp() * 1000)
+            end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
+            
+            all_sales = fetch_all_sales(
                 seller_id=seller_id,
                 api_key=api_key,
                 api_secret=api_secret,
                 start_date=start_ts,
                 end_date=end_ts,
-                transaction_type="Sale",
-                page=0,
-                size=500,
                 store_front_code=store_front_code,
                 user_agent=user_agent,
             )
-            sales_content = sales_data.get("content", []) if isinstance(sales_data, dict) else []
-            print(f"Toplam satış kaydı: {len(sales_content)}")
-
-            print("Kargo ücretleri çekiliyor...")
-            shipping_fees = build_shipping_fee_map(
+            
+            logger.info(f"\n{'='*70}")
+            logger.info(f"ADIM 2-4: 15 GÜNLÜK 3 PERİYOTLA KARGO FATURALARI ÇEKİLİYOR")
+            logger.info(f"{'='*70}")
+            
+            cargo_periods = create_15day_periods(start_dt, end_dt)
+            
+            all_cargo_items = fetch_all_cargo_from_periods(
                 seller_id=seller_id,
                 api_key=api_key,
                 api_secret=api_secret,
-                start_date=start_ts,
-                end_date=end_ts 
+                periods=cargo_periods,
+                store_front_code=store_front_code,
+                user_agent=user_agent,
             )
-
-            logger.info(f"Bulunan kargo ücreti kayıtları: {len(shipping_fees)}")
-            results = calculate_profit_with_shipping(sales_content, shipping_fees)
-            logger.info(f"Hesaplanan toplam sonuç: {len(results)}")
+            
+            results = match_sales_with_cargo(all_sales, all_cargo_items)
+            
+            logger.info(f"\n{'='*70}")
+            logger.info(f"ÖZET")
+            logger.info(f"{'='*70}")
+            logger.info(f"Toplam Satış: {len(all_sales)}")
+            logger.info(f"Toplam Kargo Ürünü: {len(all_cargo_items)}")
+            logger.info(f"Eşleştirilen Sonuç: {len(results)}")
+            
+            cargo_found_count = sum(1 for r in results if r.get('cargoFound'))
+            cargo_not_found_count = len(results) - cargo_found_count
+            logger.info(f"Kargo Bulunan Satış: {cargo_found_count}")
+            logger.info(f"Kargo Bulunamayan Satış: {cargo_not_found_count}")
+            logger.info(f"{'='*70}\n")
 
         except Exception as e:
-            print("Hata [trendyol_profit]:", e)
+            logger.error(f"Trendyol profit hesaplamasında hata: {str(e)}")
             traceback.print_exc()
             results = []
 
-    else:
-        print("Tarih aralığı seçilmemiş.")
+    total_net_profit = 0
+    if results:
+        total_net_profit = sum(r.get('netProfit', 0) for r in results)
 
-    context = {'results': results, 'start_date': start_date, 'end_date': end_date}
-    print(f"📊 Sayfa render ediliyor, sonuç sayısı: {len(results)}")
+    context = {
+        'results': results,
+        'start_date': start_date,
+        'end_date': end_date,
+        'total_net_profit': round(total_net_profit, 2)
+    }
     return render(request, 'inventory/trendyol_profit.html', context)
 
 
 def login_view(request):
-    LOGIN_PASSWORD = '123456'
+    error = None
     if request.method == 'POST':
-        password = request.POST.get('password')
-        if password == LOGIN_PASSWORD:
+        password = request.POST.get('password', '')
+        if password == '123456':
             request.session['is_logged_in'] = True
             return redirect('product_list')
         else:
-            return render(request, 'inventory/login.html', {'error': 'Invalid password'})
-    return render(request, 'inventory/login.html')
+            error = 'Şifre yanlış'
+    
+    return render(request, 'inventory/login.html', {'error': error})
 
 
 def logout_view(request):
