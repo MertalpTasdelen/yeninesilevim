@@ -375,9 +375,15 @@ def match_sales_with_cargo(
         barcode = sale.get("barcode")
         order_number = str(sale.get("orderNumber", ""))
         seller_revenue = sale.get("sellerRevenue")
+        transaction_date_ms = sale.get("transactionDate")
         
         if not barcode or seller_revenue is None:
             continue
+        
+        transaction_date = None
+        if transaction_date_ms:
+            transaction_date = convert_timestamp_to_datetime(transaction_date_ms)
+            logger.info(f"Sipariş {order_number} - İşlem Tarihi: {transaction_date}")
         
         purchase_price: float = 0.0
         shipping_fee: float = 0.0
@@ -399,6 +405,7 @@ def match_sales_with_cargo(
         results.append({
             "barcode": barcode,
             "orderNumber": order_number,
+            "transactionDate": transaction_date,
             "sellerRevenue": round(float(seller_revenue), 2),
             "purchasePrice": round(purchase_price, 2),
             "shippingFee": shipping_fee,
@@ -413,7 +420,75 @@ def match_sales_with_cargo(
     logger.info(f"  Kargo Bulunamadı: {len(results) - cargo_found_count}")
     logger.info(f"  Toplam Net Kâr: {round(total_net_profit, 2)} TL")
     
-    for result in results:
-        result['totalNetProfit'] = round(total_net_profit, 2)
-    
     return results
+
+
+def create_pivot_results(
+    results: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    
+    pivot_data: Dict[str, Dict[str, Any]] = {}
+    
+    for result in results:
+        order_number = str(result.get("orderNumber", ""))
+        
+        if order_number not in pivot_data:
+            pivot_data[order_number] = {
+                "orderNumber": order_number,
+                "transactionDate": result.get("transactionDate"),
+                "items": [],
+                "totalSellerRevenue": 0.0,
+                "totalPurchasePrice": 0.0,
+                "totalShippingFee": 0.0,
+                "cargoFound": False,
+            }
+        
+        pivot_data[order_number]["items"].append({
+            "barcode": result.get("barcode"),
+            "sellerRevenue": result.get("sellerRevenue"),
+            "purchasePrice": result.get("purchasePrice"),
+        })
+        
+        pivot_data[order_number]["totalSellerRevenue"] += float(result.get("sellerRevenue", 0))
+        pivot_data[order_number]["totalPurchasePrice"] += float(result.get("purchasePrice", 0))
+        pivot_data[order_number]["cargoFound"] = result.get("cargoFound", False)
+    
+    for order_number, data in pivot_data.items():
+        if data["cargoFound"]:
+            for result in results:
+                if str(result.get("orderNumber", "")) == order_number:
+                    data["totalShippingFee"] = float(result.get("shippingFee", 0))
+                    break
+    
+    pivot_results = []
+    for order_number in sorted(pivot_data.keys()):
+        data = pivot_data[order_number]
+        total_net_profit = (
+            data["totalSellerRevenue"] - 
+            data["totalPurchasePrice"] - 
+            data["totalShippingFee"]
+        )
+        
+        pivot_results.append({
+            "orderNumber": order_number,
+            "transactionDate": data["transactionDate"],
+            "items": data["items"],
+            "itemCount": len(data["items"]),
+            "totalSellerRevenue": round(data["totalSellerRevenue"], 2),
+            "totalPurchasePrice": round(data["totalPurchasePrice"], 2),
+            "totalShippingFee": round(data["totalShippingFee"], 2),
+            "totalNetProfit": round(total_net_profit, 2),
+            "cargoFound": data["cargoFound"],
+        })
+    
+    logger.info(f"Pivot sonuçlar oluşturuldu: {len(pivot_results)} sipariş")
+    return pivot_results
+
+def convert_timestamp_to_datetime(timestamp_ms: int) -> datetime.datetime:
+    if not timestamp_ms:
+        return None
+    try:
+        return datetime.datetime.fromtimestamp(timestamp_ms / 1000, tz=datetime.timezone.utc)
+    except Exception as e:
+        logger.error(f"Timestamp dönüşümü hatası: {str(e)}")
+        return None

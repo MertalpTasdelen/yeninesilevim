@@ -9,6 +9,7 @@ from .trendyol_integration import (
     create_15day_periods,
     fetch_all_cargo_from_periods,
     match_sales_with_cargo,
+    create_pivot_results,
 )
 import logging
 import traceback
@@ -271,6 +272,7 @@ def trendyol_profit(request):
         return resp
 
     results = []
+    pivot_results = []
     start_date = request.GET.get('start_date')
     end_date = request.GET.get('end_date')
 
@@ -284,9 +286,9 @@ def trendyol_profit(request):
             logger.info(f"{'='*70}")
             logger.info(f"Seçilen Tarih Aralığı: {start_date} - {end_date}")
             
-            seller_id = "XXXX"
-            api_key = "XXXXXX"
-            api_secret = "XXXXXX"
+            seller_id = "XXX"
+            api_key = "XXXXX"
+            api_secret = "XXXXX"
             store_front_code = "TRENDYOLTR"
             user_agent = f"{seller_id}-OzlemFiratTasdelen"
             
@@ -309,6 +311,7 @@ def trendyol_profit(request):
                 store_front_code=store_front_code,
                 user_agent=user_agent,
             )
+            logger.info(f"Adım 1 Tamamlandı: {len(all_sales)} satış kaydı çekildi")
             
             logger.info(f"\n{'='*70}")
             logger.info(f"ADIM 2-4: 15 GÜNLÜK 3 PERİYOTLA KARGO FATURALARI ÇEKİLİYOR")
@@ -327,30 +330,44 @@ def trendyol_profit(request):
             
             results = match_sales_with_cargo(all_sales, all_cargo_items)
             
+            logger.info(f"Adım 1-4 Tamamlandı: {len(results)} ürün işlendi")
+            
+            logger.info(f"\n{'='*70}")
+            logger.info(f"ADIM 5: SİPARİŞ BAZLI PİVOT TABLOSU OLUŞTURULUYOR")
+            logger.info(f"{'='*70}")
+            
+            pivot_results = create_pivot_results(results)
+            
             logger.info(f"\n{'='*70}")
             logger.info(f"ÖZET")
             logger.info(f"{'='*70}")
             logger.info(f"Toplam Satış: {len(all_sales)}")
             logger.info(f"Toplam Kargo Ürünü: {len(all_cargo_items)}")
-            logger.info(f"Eşleştirilen Sonuç: {len(results)}")
+            logger.info(f"Toplam Ürün Satırı: {len(results)}")
+            logger.info(f"Toplam Sipariş: {len(pivot_results)}")
             
-            cargo_found_count = sum(1 for r in results if r.get('cargoFound'))
-            cargo_not_found_count = len(results) - cargo_found_count
-            logger.info(f"Kargo Bulunan Satış: {cargo_found_count}")
-            logger.info(f"Kargo Bulunamayan Satış: {cargo_not_found_count}")
+            cargo_found_count = sum(1 for r in pivot_results if r.get('cargoFound'))
+            cargo_not_found_count = len(pivot_results) - cargo_found_count
+            logger.info(f"Kargo Bulunan Sipariş: {cargo_found_count}")
+            logger.info(f"Kargo Bulunamayan Sipariş: {cargo_not_found_count}")
+            
+            total_net_profit = sum(r.get('totalNetProfit', 0) for r in pivot_results)
+            logger.info(f"Toplam Net Kâr: {round(total_net_profit, 2)} TL")
             logger.info(f"{'='*70}\n")
 
         except Exception as e:
             logger.error(f"Trendyol profit hesaplamasında hata: {str(e)}")
             traceback.print_exc()
             results = []
+            pivot_results = []
 
     total_net_profit = 0
-    if results:
-        total_net_profit = sum(r.get('netProfit', 0) for r in results)
+    if pivot_results:
+        total_net_profit = sum(r.get('totalNetProfit', 0) for r in pivot_results)
 
     context = {
         'results': results,
+        'pivot_results': pivot_results,
         'start_date': start_date,
         'end_date': end_date,
         'total_net_profit': round(total_net_profit, 2)
