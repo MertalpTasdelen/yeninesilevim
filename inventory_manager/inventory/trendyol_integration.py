@@ -466,7 +466,8 @@ def create_pivot_results(
         total_net_profit = (
             data["totalSellerRevenue"] - 
             data["totalPurchasePrice"] - 
-            data["totalShippingFee"]
+            data["totalShippingFee"] -
+            11
         )
         
         pivot_results.append({
