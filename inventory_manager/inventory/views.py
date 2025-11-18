@@ -286,9 +286,9 @@ def trendyol_profit(request):
             logger.info(f"{'='*70}")
             logger.info(f"Seçilen Tarih Aralığı: {start_date} - {end_date}")
             
-            seller_id = "XXX"
-            api_key = "XXXXX"
-            api_secret = "XXXXX"
+            seller_id = "XXXX"
+            api_key = "XXXX"
+            api_secret = "XXXX"
             store_front_code = "TRENDYOLTR"
             user_agent = f"{seller_id}-OzlemFiratTasdelen"
             

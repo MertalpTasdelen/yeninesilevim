@@ -25,9 +25,10 @@ os.makedirs(LOG_DIR, exist_ok=True)
 SECRET_KEY = 'django-insecure-%imsrqovq2qp76w$y_vpm*sv#sj*vqwq@$1a*78+1j=p6ct(f7'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['www.yeninesilevim.com',
+                 'yeninesilevim.com']
 
 
 # Application definition
@@ -125,6 +126,11 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+STATICFILES_DIRS = [
+    BASE_DIR / 'inventory/static',
+]
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -144,7 +150,7 @@ LOGGING = {
             'style': '{',
         },
     },
-    
+
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',

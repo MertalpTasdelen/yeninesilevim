@@ -1,11 +1,11 @@
 {% comment %}
-    This template renders a paginated list of products.  To protect
-    sensitive business information (purchase price, commission rates and
-    stock levels) when the viewer has not authenticated, the values
-    are conditionally displayed.  The view passes the request object
-    into the template context, so we can check the `is_logged_in` flag
-    stored in the session.  If the flag is false or missing, the
-    sensitive fields are hidden entirely.
+This template renders a paginated list of products. To protect
+sensitive business information (purchase price, commission rates and
+stock levels) when the viewer has not authenticated, the values
+are conditionally displayed. The view passes the request object
+into the template context, so we can check the `is_logged_in` flag
+stored in the session. If the flag is false or missing, the
+sensitive fields are hidden entirely.
 {% endcomment %}
 
 {% for product in page_obj %}
@@ -15,9 +15,13 @@
             <div class="row">
                 <div class="col-12">
                     {% if product.image_url %}
-                        <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid">
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" class="img-fluid">
                     {% else %}
-                        No Image
+                    {# Görsel yoksa ikon ve metin içeren yer tutucu göster #}
+                    <div class="no-image d-flex align-items-center justify-content-center flex-column">
+                        <i class="bi bi-card-image mb-2" style="font-size: 2rem;"></i>
+                        <span>Görsel Yok</span>
+                    </div>
                     {% endif %}
                 </div>
                 <div class="col-12">
@@ -25,32 +29,27 @@
                     <p class="card-text">Barkod: {{ product.barcode }}</p>
                     {# Only show purchase price, commission and stock when the user is authenticated #}
                     {% if request.session.is_logged_in %}
-                        <p class="card-text">Alış Fiyatı: {{ product.purchase_price }}</p>
-                        <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
-                        <p class="card-text">Komisyon: %{{ product.commution }}</p>
-                        <p class="card-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></p>
+                    <p class="card-text">Alış Fiyatı: {{ product.purchase_price }}</p>
+                    <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
+                    <p class="card-text">Komisyon: %{{ product.commution }}</p>
+                    <p class="card-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></p>
                     {% else %}
-                        <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
-                        <p class="card-text text-muted">Alış fiyatı, komisyon ve stok bilgileri için giriş yapın.</p>
+                    <p class="card-text">Satış Fiyatı: {{ product.selling_price }}</p>
+                    <p class="card-text text-muted">Alış fiyatı, komisyon ve stok bilgileri için giriş yapın.</p>
                     {% endif %}
                     <div class="btn-group product-buttons" role="group">
-                        <button type="button" class="btn btn-info btn-sm me-2" onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}')">Kâr Hesapla</button>
-                        <a href="{% url 'edit_product' product.id %}" class="btn btn-warning btn-sm me-2 edit-button">Düzenle</a>
-                        <form method="post"
-                              action="{% url 'adjust_stock' product.id 1 %}"
-                              style="display:inline;"
-                              class="stock-adjust-form me-2"
-                              data-product-id="{{ product.id }}"
-                              data-amount="1">
+                        <button type="button" class="btn btn-info btn-sm me-2"
+                            onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}')">Kâr
+                            Hesapla</button>
+                        <a href="{% url 'edit_product' product.id %}"
+                            class="btn btn-warning btn-sm me-2 edit-button">Düzenle</a>
+                        <form method="post" action="{% url 'adjust_stock' product.id 1 %}" style="display:inline;"
+                            class="stock-adjust-form me-2" data-product-id="{{ product.id }}" data-amount="1">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-success btn-sm stock-adjust-button">+1</button>
                         </form>
-                        <form method="post"
-                              action="{% url 'adjust_stock' product.id -1 %}"
-                              style="display:inline;"
-                              class="stock-adjust-form"
-                              data-product-id="{{ product.id }}"
-                              data-amount="-1">
+                        <form method="post" action="{% url 'adjust_stock' product.id -1 %}" style="display:inline;"
+                            class="stock-adjust-form" data-product-id="{{ product.id }}" data-amount="-1">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger btn-sm stock-adjust-button">-1</button>
                         </form>
