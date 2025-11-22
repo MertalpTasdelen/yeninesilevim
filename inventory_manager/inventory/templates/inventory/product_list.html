@@ -7,7 +7,6 @@
     <h2 class="mb-4">Ürün Listesi</h2>
     {% if webpush %}
     <div class="mb-3">
-        {# Bootstrap class ile sarı bir “stok uyarıları” butonu #}
         {% webpush_button with_class="btn btn-outline-warning" %}
     </div>
     {% endif %}
@@ -236,30 +235,58 @@ document.addEventListener('DOMContentLoaded', function () {
     consumeStoredBarcode();
 
     /**
-     * Intercept stock adjustment forms (plus/minus buttons) and submit via AJAX
-     * instead of doing a full page reload. This function relies on jQuery to
-     * register the delegated event handler.
+     * Stock adjustment forms - AJAX submission (no page reload)
      */
-    $(document).on('submit', '.stock-adjust-form', function (e) {
+    $(document).on('click', '.stock-adjust-button', function (e) {
         e.preventDefault();
-        const form = $(this);
-        // Skip if the button is disabled.
-        if (form.find('button').hasClass('disabled')) {
-            return;
+        e.stopPropagation();
+        
+        const button = $(this);
+        const form = button.closest('.stock-adjust-form');
+        
+        // Skip if disabled
+        if (button.prop('disabled') || button.hasClass('disabled')) {
+            return false;
         }
+        
+        // Disable button during request
+        button.prop('disabled', true);
+        
         const action = form.attr('action');
-        fetch(action, {
-            method: 'POST',
+        const productId = form.data('product-id');
+        
+        // AJAX request
+        $.ajax({
+            url: action,
+            type: 'POST',
+            data: form.serialize(),
             headers: {
-                'X-CSRFToken': csrftoken,
                 'X-Requested-With': 'XMLHttpRequest'
+            },
+            success: function(data) {
+                // Update stock value
+                const stockElement = $('#stock-' + productId);
+                if (stockElement.length && data.stock !== undefined) {
+                    stockElement.addClass('stock-updating text-success');
+                    stockElement.text(data.stock);
+                    
+                    // Remove animation after 500ms
+                    setTimeout(function() {
+                        stockElement.removeClass('stock-updating text-success');
+                    }, 500);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Stok güncellenirken hata:', error);
+                alert('Stok güncellenemedi. Lütfen tekrar deneyin.');
+            },
+            complete: function() {
+                // Re-enable button
+                button.prop('disabled', false);
             }
-        })
-        .then(res => res.json())
-        .then(data => {
-            const productId = form.data('product-id');
-            document.getElementById('stock-' + productId).innerText = data.stock;
         });
+        
+        return false;
     });
 
     // Initial button state update.

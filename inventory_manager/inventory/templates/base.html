@@ -94,6 +94,115 @@
                     });
             });
         }
+
+        // ✅ CSRF Token Helper
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // ✅ VAPID Key Base64 -> Uint8Array Dönüşümü
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding)
+                .replace(/\-/g, '+')
+                .replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        // ✅ Push Notification Subscription Fonksiyonu
+        window.subscribeToPush = function() {
+            console.log('🚀 subscribeToPush() çağrıldı!');
+            
+            if (!('serviceWorker' in navigator)) {
+                console.error('❌ Service Worker desteklenmiyor');
+                alert('❌ Tarayıcınız bildirim desteği sunmuyor.');
+                return Promise.reject('Service Worker desteklenmiyor');
+            }
+
+            console.log('✅ Service Worker destekleniyor, hazır olması bekleniyor...');
+
+            return navigator.serviceWorker.ready.then(function(registration) {
+                console.log('✅ Service Worker hazır:', registration);
+                
+                const vapidPublicKey = "{{ WEBPUSH_SETTINGS.VAPID_PUBLIC_KEY }}";
+                console.log('VAPID Key:', vapidPublicKey ? 'Mevcut ✅' : 'YOK ❌');
+                
+                if (!vapidPublicKey) {
+                    console.error('❌ VAPID public key bulunamadı!');
+                    alert('❌ Sunucu yapılandırma hatası.');
+                    return Promise.reject('VAPID key yok');
+                }
+
+                console.log('🔔 Bildirim izni isteniyor...');
+
+                return Notification.requestPermission().then(function(permission) {
+                    console.log('📋 İzin durumu:', permission);
+                    
+                    if (permission !== 'granted') {
+                        console.warn('⚠️ Bildirim izni reddedildi veya verilmedi');
+                        alert('❌ Bildirim izni reddedildi!');
+                        return Promise.reject('İzin reddedildi');
+                    }
+
+                    console.log('✅ İzin verildi, subscription oluşturuluyor...');
+
+                    return registration.pushManager.subscribe({
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                    });
+                });
+            }).then(function(subscription) {
+                console.log('📤 Subscription oluşturuldu:', subscription);
+                console.log('📤 Endpoint:', subscription.endpoint);
+
+                return fetch('/webpush/save_information', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({
+                        subscription: subscription.toJSON(),
+                        group: 'low_stock',
+                        browser: navigator.userAgent
+                    })
+                });
+            }).then(function(response) {
+                console.log('📥 Sunucu cevabı:', response.status, response.statusText);
+                
+                if (response.ok) {
+                    alert('✅ Stok uyarıları başarıyla aktif edildi!');
+                    console.log('✅ Subscription sunucuya kaydedildi');
+                    return response.json();
+                } else {
+                    console.error('❌ Sunucu hatası:', response.status);
+                    return response.text().then(function(text) {
+                        console.error('❌ Hata detayı:', text);
+                        alert('❌ Kayıt başarısız oldu. Lütfen tekrar deneyin.');
+                        throw new Error('Subscription kaydetme başarısız: ' + response.status);
+                    });
+                }
+            }).catch(function(error) {
+                console.error('❌ Push subscription hatası:', error);
+                alert('❌ Bir hata oluştu: ' + error.message);
+            });
+        };
     </script>
 </body>
 </html>

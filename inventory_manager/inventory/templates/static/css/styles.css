@@ -38,3 +38,20 @@
     border-radius: 8px;
     font-size: 0.9rem;
 }
+
+/* ========= Stock Update Animation ========= */
+@keyframes stockUpdate {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.stock-updating {
+    animation: stockUpdate 0.5s ease;
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+
+.text-success {
+    color: #28a745 !important;
+}
