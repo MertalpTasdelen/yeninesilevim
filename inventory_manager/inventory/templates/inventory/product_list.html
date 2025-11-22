@@ -1,8 +1,16 @@
 {% extends 'base.html' %}
+{% load webpush_notifications %}
+
 
 {% block content %}
 <div class="container mt-5">
     <h2 class="mb-4">Ürün Listesi</h2>
+    {% if webpush %}
+    <div class="mb-3">
+        {# Bootstrap class ile sarı bir “stok uyarıları” butonu #}
+        {% webpush_button with_class="btn btn-outline-warning" %}
+    </div>
+    {% endif %}
     <form method="GET" action="{% url 'product_list' %}" class="mb-4">
         <div class="input-group mb-3">
             <input type="text" id="search-input" name="q" class="form-control"

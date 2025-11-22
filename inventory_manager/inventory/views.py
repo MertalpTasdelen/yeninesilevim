@@ -2,6 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
+from django.urls import reverse
 from .models import Product, ProfitCalculator
 from .forms import ProductForm
 from .trendyol_integration import (
@@ -14,6 +15,8 @@ from .trendyol_integration import (
 import logging
 import traceback
 import datetime
+
+from webpush import send_group_notification
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +31,9 @@ def product_list(request):
     query = request.GET.get('q', '')
     sort_by = request.GET.get('sort_by', '')
     page = request.GET.get('page', 1)
-    
+
     products = Product.objects.all()
-    
+
     if query:
         products = products.filter(
             name__icontains=query
@@ -39,7 +42,7 @@ def product_list(request):
         ) | products.filter(
             purchase_barcode__icontains=query
         )
-    
+
     if sort_by == 'stock_desc':
         products = products.order_by('-stock')
     elif sort_by == 'stock_asc':
@@ -50,10 +53,11 @@ def product_list(request):
         products = products.order_by('selling_price')
     else:
         products = products.order_by('-created_at')
-    
+
     paginator = Paginator(products, 12)
     page_obj = paginator.get_page(page)
-    
+
+    # AJAX isteklerinde sadece HTML fragment dön
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         html = render(
             request,
@@ -64,11 +68,15 @@ def product_list(request):
             'html': html,
             'has_next': page_obj.has_next()
         })
-    
+
+    # Web push için grup context’i -> template’te subscribe butonu için
+    webpush_context = {'group': 'low_stock'}  # 👈 kritik
+
     context = {
         'page_obj': page_obj,
         'query': query,
         'sort_by': sort_by,
+        'webpush': webpush_context,
     }
     return render(request, 'inventory/product_list.html', context)
 
@@ -253,16 +261,37 @@ def adjust_stock(request, id, amount):
     resp = _require_login(request)
     if resp:
         return JsonResponse({'success': False}, status=401)
-    
+
     product = get_object_or_404(Product, id=id)
+
+    # Eski stok değerini kaydet
+    old_stock = product.stock
+
+    # Yeni stok değerini uygula
     product.stock += int(amount)
     if product.stock < 0:
         product.stock = 0
     product.save()
-    
+
+    # Eşik kontrolü: stok 3'ün altına düştüyse ve eski stok >= 3 idiyse bildirim gönder
+    try:
+        if product.stock < 3 and old_stock >= 3:
+            payload = {
+                "head": "Stok Uyarısı",
+                "body": f"{product.name} ürününün stoğu {product.stock} adetin altına düştü.",
+                # Bildirim ikonu (statik ikon dosyan olsun, yoksa path’i değiştir)
+                "icon": "/static/img/icons/icon-192x192.png",
+                # Bildirime tıklandığında gidilecek URL
+                "url": request.build_absolute_uri(reverse('product_list')),
+            }
+            # "low_stock" grubuna abone olan herkese gönder
+            send_group_notification(group_name="low_stock", payload=payload, ttl=1000)
+    except Exception as e:
+        logger.error(f"Error sending push notification: {e}")
+
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True, 'stock': product.stock})
-    
+
     return redirect('product_list')
 
 
@@ -281,14 +310,18 @@ def trendyol_profit(request):
             start_dt = datetime.datetime.strptime(start_date, "%Y-%m-%d")
             end_dt = datetime.datetime.strptime(end_date, "%Y-%m-%d")
             
+            # UTC timezone ekle
+            start_dt = start_dt.replace(tzinfo=datetime.timezone.utc)
+            end_dt = end_dt.replace(hour=23, minute=59, second=59, tzinfo=datetime.timezone.utc)
+            
             logger.info(f"\n{'='*70}")
             logger.info(f"TRENDYOL KÂRI RAPORU İŞLEMİ BAŞLADI")
             logger.info(f"{'='*70}")
             logger.info(f"Seçilen Tarih Aralığı: {start_date} - {end_date}")
             
-            seller_id = "XXXX"
-            api_key = "XXXX"
-            api_secret = "XXXX"
+            seller_id = "973871"
+            api_key = "uxKAGmeBsn35z1Pkyszs"
+            api_secret = "A8eBLEct9tABS4Q5UB30"
             store_front_code = "TRENDYOLTR"
             user_agent = f"{seller_id}-OzlemFiratTasdelen"
             
@@ -300,7 +333,7 @@ def trendyol_profit(request):
             logger.info(f"{'='*70}")
             
             start_ts = int(start_dt.timestamp() * 1000)
-            end_ts = int((end_dt + datetime.timedelta(days=1)).timestamp() * 1000) - 1
+            end_ts = int(end_dt.timestamp() * 1000)
             
             all_sales = fetch_all_sales(
                 seller_id=seller_id,
@@ -373,7 +406,6 @@ def trendyol_profit(request):
         'total_net_profit': round(total_net_profit, 2)
     }
     return render(request, 'inventory/trendyol_profit.html', context)
-
 
 def login_view(request):
     error = None
