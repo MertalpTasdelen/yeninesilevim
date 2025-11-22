@@ -5,6 +5,7 @@ from django.views.decorators.http import require_http_methods
 from django.urls import reverse
 from .models import Product, ProfitCalculator
 from .forms import ProductForm
+from .notifications import LowStockNotificationService
 from .trendyol_integration import (
     fetch_all_sales,
     create_15day_periods,
@@ -12,11 +13,9 @@ from .trendyol_integration import (
     match_sales_with_cargo,
     create_pivot_results,
 )
+import datetime
 import logging
 import traceback
-import datetime
-
-from webpush import send_group_notification
 
 logger = logging.getLogger(__name__)
 
@@ -274,20 +273,11 @@ def adjust_stock(request, id, amount):
     product.save()
 
     # Eşik kontrolü: stok 3'ün altına düştüyse ve eski stok >= 3 idiyse bildirim gönder
-    try:
-        if product.stock < 3 and old_stock >= 3:
-            payload = {
-                "head": "Stok Uyarısı",
-                "body": f"{product.name} ürününün stoğu {product.stock} adetin altına düştü.",
-                # Bildirim ikonu (statik ikon dosyan olsun, yoksa path’i değiştir)
-                "icon": "/static/img/icons/icon-192x192.png",
-                # Bildirime tıklandığında gidilecek URL
-                "url": request.build_absolute_uri(reverse('product_list')),
-            }
-            # "low_stock" grubuna abone olan herkese gönder
-            send_group_notification(group_name="low_stock", payload=payload, ttl=1000)
-    except Exception as e:
-        logger.error(f"Error sending push notification: {e}")
+    notifier = LowStockNotificationService()
+    notifier.notify_if_needed(
+        product=product,
+        target_url=request.build_absolute_uri(reverse('product_list')),
+    )
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'success': True, 'stock': product.stock})
