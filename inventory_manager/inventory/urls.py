@@ -1,9 +1,9 @@
-from django.urls import path, re_path
+from django.urls import path, re_path, include
 from . import views
+from django.contrib import admin
 
 urlpatterns = [
     # List and search products
-    path('', views.product_list, name='product_list'),
     path('', views.product_list, name='product_list'),
     path('ajax/search/', views.ajax_search, name='ajax_search'),
     # CRUD operations on products

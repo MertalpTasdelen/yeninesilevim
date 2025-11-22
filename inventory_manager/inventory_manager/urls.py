@@ -19,5 +19,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('inventory.urls'))
+    # Web push endpoint’leri
+    path('webpush/', include('webpush.urls')),
+    # Uygulamanın geri kalanı
+    path('', include('inventory.urls')),
 ]

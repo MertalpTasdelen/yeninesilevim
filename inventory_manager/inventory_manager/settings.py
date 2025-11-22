@@ -35,6 +35,7 @@ ALLOWED_HOSTS = ['www.yeninesilevim.com',
 
 INSTALLED_APPS = [
     'inventory',
+    'webpush',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -66,7 +67,8 @@ TEMPLATES = [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages'
+                'django.contrib.messages.context_processors.messages',
+                'inventory_manager.context_processors.webpush_settings'
             ],
         },
     },
@@ -167,4 +169,10 @@ LOGGING = {
         'handlers': ['console', 'file'],
         'level': 'INFO',
     },
+}
+
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": "BPEgOdLWQ_42vPD1Mx1w6HouD7S_Wrg7-VRn6ycJVsTUSKuNPaDU1cuX3TWCyEUd4Ou4rZh9zACzh3m1QvgLklA",
+    "VAPID_PRIVATE_KEY": "ZKRZ4R_txxjQp2ruU2KKobNHeW2gCgYIKoZIzj0DAQc",
+    "VAPID_ADMIN_EMAIL": "admin@yeninesilevim.com",
 }

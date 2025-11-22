@@ -1,21 +1,23 @@
 from django.db import models
 
+
 class Product(models.Model):
-    name = models.CharField(max_length=100)  # Ürün ismi
-    barcode = models.CharField(max_length=50, unique=True)  # Barkod alanı
-    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)  # Alış fiyatı
-    selling_price = models.DecimalField(max_digits=10, decimal_places=2)  # Satış fiyatı
-    commution = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)  # Komisyon oranı
-    stock = models.PositiveIntegerField()  # Stok adedi
-    image_url = models.CharField(max_length=1024, blank=True, null=True)  # Image URL
-    created_at = models.DateTimeField(auto_now_add=True)  # Ürün eklenme zamanı
+    name = models.CharField(max_length=100)
+    barcode = models.CharField(max_length=50, unique=True)
+    purchase_price = models.DecimalField(max_digits=10, decimal_places=2)
+    selling_price = models.DecimalField(max_digits=10, decimal_places=2)
+    commution = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
+    stock = models.PositiveIntegerField()
+    image_url = models.CharField(max_length=1024, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    low_stock_notified_at = models.DateTimeField(blank=True, null=True)
     purchase_barcode = models.CharField(
         "Alış barkodu",
-        max_length=128,            # Barkod uzunluğunuza göre 64/128/255 seçebilirsiniz
+        max_length=128,
         blank=True,
         null=True,
-        db_index=True,             # Arama/filtrelerde performans için endeks
-        help_text="Tedarikçinin/alış fişinin barkodu (opsiyonel)."
+        db_index=True,
+        help_text="Tedarikçinin/alış fişinin barkodu (opsiyonel).",
     )
 
     def __str__(self):
@@ -26,7 +28,8 @@ class Product(models.Model):
         return self.selling_price - self.purchase_price
 
     class Meta:
-        db_table = 'inventory_product'
+        db_table = "inventory_product"
+
 
 class ProfitCalculator(models.Model):
     barcode = models.CharField(max_length=50, unique=True)
@@ -46,6 +49,7 @@ class ProfitCalculator(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.name
+        return f"Profit calculation for {self.barcode}"
+
     class Meta:
-        db_table = 'profits'
+        db_table = "profits"
