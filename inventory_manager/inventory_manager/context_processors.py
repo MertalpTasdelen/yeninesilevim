@@ -7,5 +7,5 @@ def webpush_settings(request):
     base.html'deki subscribeToPush() fonksiyonu için gerekli.
     """
     return {
-        'WEBPUSH_SETTINGS': settings.WEBPUSH_SETTINGS
+        'VAPID_PUBLIC_KEY': settings.VAPID_PUBLIC_KEY
     }
