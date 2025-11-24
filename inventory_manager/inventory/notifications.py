@@ -1,13 +1,14 @@
 import logging
+import json
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
 from django.conf import settings
 from django.urls import reverse
 from django.utils import timezone
-from webpush import send_group_notification
+from pywebpush import webpush, WebPushException
 
-from .models import Product
+from .models import Product, PushSubscription
 
 
 logger = logging.getLogger(__name__)
@@ -73,10 +74,69 @@ class LowStockNotificationService:
         product.save(update_fields=["low_stock_notified_at"])
 
     def send_payload(self, payload: NotificationPayload) -> None:
-        send_group_notification(
-            group_name=self.group_name,
-            payload=payload.as_dict(),
-            ttl=1000,
+        """Send push notification to all subscribers in the group using pywebpush."""
+        subscriptions = PushSubscription.objects.filter(group=self.group_name)
+        
+        if not subscriptions.exists():
+            logger.warning(f"No subscriptions found for group: {self.group_name}")
+            return
+        
+        # Build VAPID claims
+        vapid_claims = {
+            "sub": f"mailto:{settings.VAPID_ADMIN_EMAIL}"
+        }
+        
+        vapid_private_key = settings.VAPID_PRIVATE_KEY
+        
+        success_count = 0
+        failed_count = 0
+        
+        for subscription in subscriptions:
+            try:
+                # Build subscription info dict for pywebpush
+                subscription_info = {
+                    "endpoint": subscription.endpoint,
+                    "keys": {
+                        "p256dh": subscription.p256dh,
+                        "auth": subscription.auth
+                    }
+                }
+                
+                # Send the notification
+                webpush(
+                    subscription_info=subscription_info,
+                    data=json.dumps(payload.as_dict()),
+                    vapid_private_key=vapid_private_key,
+                    vapid_claims=vapid_claims,
+                    ttl=1000
+                )
+                success_count += 1
+                
+            except WebPushException as e:
+                failed_count += 1
+                logger.error(
+                    f"Failed to send push to subscription {subscription.id}: {e}",
+                    extra={
+                        "subscription_id": subscription.id,
+                        "status_code": e.response.status_code if e.response else None
+                    }
+                )
+                
+                # If subscription is invalid (410 Gone), delete it
+                if e.response and e.response.status_code == 410:
+                    logger.info(f"Deleting expired subscription {subscription.id}")
+                    subscription.delete()
+                    
+            except Exception as e:
+                failed_count += 1
+                logger.error(
+                    f"Unexpected error sending push to subscription {subscription.id}: {e}",
+                    extra={"subscription_id": subscription.id}
+                )
+        
+        logger.info(
+            f"Push notification sent: {success_count} succeeded, {failed_count} failed",
+            extra={"group": self.group_name}
         )
 
     def notify_if_needed(

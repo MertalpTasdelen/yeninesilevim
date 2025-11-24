@@ -136,7 +136,7 @@
             return navigator.serviceWorker.ready.then(function(registration) {
                 console.log('✅ Service Worker hazır:', registration);
                 
-                const vapidPublicKey = "{{ WEBPUSH_SETTINGS.VAPID_PUBLIC_KEY }}";
+                const vapidPublicKey = "{{ VAPID_PUBLIC_KEY }}";
                 console.log('VAPID Key:', vapidPublicKey ? 'Mevcut ✅' : 'YOK ❌');
                 
                 if (!vapidPublicKey) {

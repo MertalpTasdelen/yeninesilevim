@@ -32,4 +32,5 @@ urlpatterns = [
     
     # Custom Push Subscription Endpoint (Debug)
     path('api/push-subscribe', views.save_push_subscription, name='save_push_subscription'),
+    path('api/test-notification', views.test_notification, name='test_notification'),
 ]
