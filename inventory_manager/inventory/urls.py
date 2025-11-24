@@ -27,4 +27,9 @@ urlpatterns = [
     path('logout/', views.logout_view, name='logout'),
     # Adjust stock via querystring; captured with regex to allow negative numbers
     re_path(r'^product/adjust_stock/(?P<id>\d+)/(?P<amount>-?\d+)/$', views.adjust_stock, name='adjust_stock'),
+    # Service Worker (Root Scope)
+    path('service-worker.js', views.service_worker, name='service_worker'),
+    
+    # Custom Push Subscription Endpoint (Debug)
+    path('api/push-subscribe', views.save_push_subscription, name='save_push_subscription'),
 ]

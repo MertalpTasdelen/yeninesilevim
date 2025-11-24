@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.urls import reverse
@@ -16,6 +16,8 @@ from .trendyol_integration import (
 import datetime
 import logging
 import traceback
+import os
+from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
@@ -414,3 +416,108 @@ def logout_view(request):
     if 'is_logged_in' in request.session:
         del request.session['is_logged_in']
     return redirect('product_list')
+
+
+def service_worker(request):
+    """
+    Serves the service-worker.js file from the static directory
+    but with the correct Content-Type and from the root scope.
+    """
+    sw_path = os.path.join(settings.BASE_DIR, 'inventory', 'static', 'js', 'service-worker.js')
+    try:
+        with open(sw_path, 'r') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except FileNotFoundError:
+        return HttpResponse("Service Worker not found", status=404)
+
+
+def save_push_subscription(request):
+    """
+    Simple endpoint to save or remove web push subscriptions using our custom model.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    try:
+        from .models import PushSubscription
+    except Exception as e:
+        logger.error('Failed to import PushSubscription: %s', e)
+        return JsonResponse({'error': 'Server configuration error'}, status=500)
+
+    # Parse incoming data
+    data = {}
+    try:
+        if request.content_type == 'application/json':
+            import json
+            body = request.body.decode('utf-8') if request.body else '{}'
+            data = json.loads(body) if body else {}
+        else:
+            data = request.POST.dict()
+    except Exception as e:
+        logger.error('Failed to parse subscription payload: %s', e)
+        return JsonResponse({'error': 'Invalid request payload'}, status=400)
+
+    status_type = data.get('status_type')
+    endpoint = data.get('endpoint')
+    p256dh = data.get('p256dh')
+    auth = data.get('auth')
+    group = data.get('group', 'default')
+
+    logger.info(f'Push subscription request: {status_type} for endpoint: {endpoint[:50] if endpoint else None}...')
+
+    # Basic validation
+    if not status_type:
+        return JsonResponse({'error': "'status_type' is required"}, status=400)
+
+    if status_type == 'subscribe':
+        missing = []
+        if not endpoint:
+            missing.append('endpoint')
+        if not p256dh:
+            missing.append('p256dh')
+        if not auth:
+            missing.append('auth')
+        if missing:
+            return JsonResponse({'error': f"Missing required fields: {', '.join(missing)}"}, status=400)
+
+        try:
+            # Simple update_or_create on our custom model
+            user_obj = request.user if (getattr(request, 'user', None) and request.user.is_authenticated) else None
+            
+            subscription, created = PushSubscription.objects.update_or_create(
+                endpoint=endpoint,
+                defaults={
+                    'p256dh': p256dh,
+                    'auth': auth,
+                    'group': group,
+                    'user': user_obj,
+                }
+            )
+            
+            logger.info(f'Subscription {"created" if created else "updated"} successfully')
+            return JsonResponse({
+                'success': True,
+                'created': created,
+                'id': subscription.id,
+            })
+                
+        except Exception as e:
+            logger.error('Failed to save subscription: %s', e)
+            logger.error('Traceback: %s', traceback.format_exc())
+            return JsonResponse({'error': 'Database error'}, status=500)
+
+    elif status_type == 'unsubscribe':
+        if not endpoint:
+            return JsonResponse({'error': "'endpoint' is required for unsubscribe"}, status=400)
+        
+        try:
+            deleted_count = PushSubscription.objects.filter(endpoint=endpoint).delete()[0]
+            logger.info(f'Unsubscribed {deleted_count} subscription(s)')
+            return JsonResponse({'success': True, 'deleted': deleted_count})
+        except Exception as e:
+            logger.error('Failed to unsubscribe: %s', e)
+            return JsonResponse({'error': 'Database error'}, status=500)
+
+    else:
+        return JsonResponse({'error': f"Invalid status_type: {status_type}"}, status=400)
