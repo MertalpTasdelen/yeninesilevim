@@ -521,3 +521,70 @@ def save_push_subscription(request):
 
     else:
         return JsonResponse({'error': f"Invalid status_type: {status_type}"}, status=400)
+
+
+def test_notification(request):
+    """Test endpoint to manually trigger low stock notifications."""
+    try:
+        from .notifications import LowStockNotificationService
+        from .models import PushSubscription, Product
+        
+        # Check all subscriptions (debug)
+        all_subscriptions = PushSubscription.objects.all()
+        all_sub_info = [f"{sub.id}: group={sub.group}, endpoint={sub.endpoint[:50]}..." for sub in all_subscriptions]
+        
+        # Check if there are any subscriptions for low_stock group
+        subscription_count = PushSubscription.objects.filter(group='low_stock').count()
+        
+        if subscription_count == 0:
+            # Show debug info
+            debug_msg = f'⚠️ Henüz bildirim aboneliği yok!\n\n'
+            debug_msg += f'Toplam subscription sayısı: {all_subscriptions.count()}\n'
+            if all_subscriptions.exists():
+                debug_msg += f'\nMevcut subscriptions:\n' + '\n'.join(all_sub_info[:3])
+            debug_msg += f'\n\nÖnce "Stok Uyarılarını Aktif Et" butonuna tıklayın.'
+            
+            return JsonResponse({
+                'success': False,
+                'message': debug_msg,
+                'subscription_count': 0,
+                'total_subscriptions': all_subscriptions.count()
+            })
+        
+        # Check if there are low stock products
+        low_stock_count = Product.objects.filter(stock__lte=3).count()
+        if low_stock_count == 0:
+            return JsonResponse({
+                'success': True,
+                'message': '✅ Düşük stoklu ürün yok (stok ≤ 3)',
+                'subscription_count': subscription_count,
+                'low_stock_count': 0
+            })
+        
+        service = LowStockNotificationService(threshold=3)
+        notified_products = service.run_scheduled_check()
+        
+        if notified_products:
+            product_names = [p.name for p in notified_products]
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ {len(notified_products)} ürün için bildirim gönderildi',
+                'products': product_names,
+                'subscription_count': subscription_count,
+                'low_stock_count': low_stock_count
+            })
+        else:
+            return JsonResponse({
+                'success': True,
+                'message': f'⚠️ {low_stock_count} düşük stoklu ürün var ama tüm bildirimler zaten gönderilmiş (6 saat cooldown)',
+                'products': [],
+                'subscription_count': subscription_count,
+                'low_stock_count': low_stock_count
+            })
+            
+    except Exception as e:
+        logger.error(f'Test notification failed: {e}', exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)

@@ -1,6 +1,4 @@
 {% extends 'base.html' %}
-{% load webpush_notifications %}
-
 
 {% block content %}
 <div class="container mt-5">
@@ -8,6 +6,9 @@
     <div class="mb-3">
         <button id="enableNotifications" class="btn btn-outline-warning" onclick="subscribeToPush()">
             <i class="bi bi-bell"></i> Stok Uyarılarını Aktif Et
+        </button>
+        <button id="testNotification" class="btn btn-outline-info ms-2" onclick="testNotification()">
+            <i class="bi bi-send"></i> Test Bildirimi Gönder
         </button>
     </div>
     <form method="GET" action="{% url 'product_list' %}" class="mb-4">
@@ -329,5 +330,88 @@ function calculatePrice(barcode, sellingPrice, commution) {
     const url = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
     window.location.href = url;
 }
+
+/**
+ * Test notification - sends a test push notification for low stock products
+ */
+function testNotification() {
+    const btn = document.getElementById('testNotification');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Gönderiliyor...';
+    
+    fetch('/api/test-notification', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = data.message;
+            if (data.products && data.products.length > 0) {
+                message += '\n\n📦 Ürünler:\n' + data.products.join('\n');
+            }
+            if (data.subscription_count !== undefined) {
+                message += '\n\n📊 İstatistikler:';
+                message += '\n• Abonelik sayısı: ' + data.subscription_count;
+                message += '\n• Düşük stoklu ürün: ' + data.low_stock_count;
+            }
+            alert(message);
+        } else {
+            alert(data.message || ('❌ Hata: ' + data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Test notification error:', error);
+        alert('❌ Bir hata oluştu: ' + error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send"></i> Test Bildirimi Gönder';
+    });
+}
+
+/**
+ * Test notification - sends a test push notification for low stock products
+ */
+function testNotification() {
+    const btn = document.getElementById('testNotification');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Gönderiliyor...';
+    
+    fetch('/api/test-notification', {
+        method: 'GET',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            let message = data.message;
+            if (data.products && data.products.length > 0) {
+                message += '\n\n📦 Ürünler:\n' + data.products.join('\n');
+            }
+            if (data.subscription_count !== undefined) {
+                message += '\n\n📊 İstatistikler:';
+                message += '\n• Abonelik sayısı: ' + data.subscription_count;
+                message += '\n• Düşük stoklu ürün: ' + data.low_stock_count;
+            }
+            alert(message);
+        } else {
+            alert(data.message || ('❌ Hata: ' + data.error));
+        }
+    })
+    .catch(error => {
+        console.error('Test notification error:', error);
+        alert('❌ Bir hata oluştu: ' + error);
+    })
+    .finally(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-send"></i> Test Bildirimi Gönder';
+    });
+}
+
 </script>
 {% endblock %}

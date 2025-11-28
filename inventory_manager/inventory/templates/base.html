@@ -136,7 +136,7 @@
             return navigator.serviceWorker.ready.then(function(registration) {
                 console.log('✅ Service Worker hazır:', registration);
                 
-                const vapidPublicKey = "{{ WEBPUSH_SETTINGS.VAPID_PUBLIC_KEY }}";
+                const vapidPublicKey = "{{ VAPID_PUBLIC_KEY }}";
                 console.log('VAPID Key:', vapidPublicKey ? 'Mevcut ✅' : 'YOK ❌');
                 
                 if (!vapidPublicKey) {
@@ -156,11 +156,28 @@
                         return Promise.reject('İzin reddedildi');
                     }
 
-                    console.log('İzin verildi, subscription oluşturuluyor...');
+                    console.log('İzin verildi, mevcut subscription kontrol ediliyor...');
 
-                    return registration.pushManager.subscribe({
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                    // Önce mevcut subscription'ı kontrol et
+                    return registration.pushManager.getSubscription().then(function(existingSubscription) {
+                        if (existingSubscription) {
+                            console.log('⚠️ Eski subscription bulundu, siliniyor...', existingSubscription);
+                            // Eski subscription'ı sil
+                            return existingSubscription.unsubscribe().then(function() {
+                                console.log('✅ Eski subscription silindi, yeni subscription oluşturuluyor...');
+                                // Yeni subscription oluştur
+                                return registration.pushManager.subscribe({
+                                    userVisibleOnly: true,
+                                    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                                });
+                            });
+                        } else {
+                            console.log('Yeni subscription oluşturuluyor...');
+                            return registration.pushManager.subscribe({
+                                userVisibleOnly: true,
+                                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+                            });
+                        }
                     });
                 });
             }).then(function(subscription) {
@@ -169,17 +186,19 @@
                 // Subscription verisini hazırla - Django-webpush'un beklediği formatta
                 const jsonSubscription = subscription.toJSON();
                 
-                // FormData kullanarak gönder (JSON yerine) - SADECE ZORUNLU ALANLAR
+                // FormData kullanarak gönder - group parametresi ile
                 const formData = new FormData();
                 formData.append('status_type', 'subscribe');
                 formData.append('endpoint', jsonSubscription.endpoint);
                 formData.append('p256dh', jsonSubscription.keys.p256dh);
                 formData.append('auth', jsonSubscription.keys.auth);
+                formData.append('group', 'low_stock');
 
-                console.log('📤 Form data hazırlandı (minimal)');
+                console.log('📤 Form data hazırlandı');
                 console.log('Endpoint:', jsonSubscription.endpoint);
                 console.log('P256DH:', jsonSubscription.keys.p256dh);
                 console.log('Auth:', jsonSubscription.keys.auth);
+                console.log('Group: low_stock');
 
                 return fetch('/api/push-subscribe', {
                     method: 'POST',
