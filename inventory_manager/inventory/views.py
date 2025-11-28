@@ -529,13 +529,26 @@ def test_notification(request):
         from .notifications import LowStockNotificationService
         from .models import PushSubscription, Product
         
-        # Check if there are any subscriptions
+        # Check all subscriptions (debug)
+        all_subscriptions = PushSubscription.objects.all()
+        all_sub_info = [f"{sub.id}: group={sub.group}, endpoint={sub.endpoint[:50]}..." for sub in all_subscriptions]
+        
+        # Check if there are any subscriptions for low_stock group
         subscription_count = PushSubscription.objects.filter(group='low_stock').count()
+        
         if subscription_count == 0:
+            # Show debug info
+            debug_msg = f'⚠️ Henüz bildirim aboneliği yok!\n\n'
+            debug_msg += f'Toplam subscription sayısı: {all_subscriptions.count()}\n'
+            if all_subscriptions.exists():
+                debug_msg += f'\nMevcut subscriptions:\n' + '\n'.join(all_sub_info[:3])
+            debug_msg += f'\n\nÖnce "Stok Uyarılarını Aktif Et" butonuna tıklayın.'
+            
             return JsonResponse({
                 'success': False,
-                'message': '⚠️ Henüz bildirim aboneliği yok! Önce "Stok Uyarılarını Aktif Et" butonuna tıklayın.',
-                'subscription_count': 0
+                'message': debug_msg,
+                'subscription_count': 0,
+                'total_subscriptions': all_subscriptions.count()
             })
         
         # Check if there are low stock products
