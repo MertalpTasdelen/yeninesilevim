@@ -125,13 +125,26 @@
         window.subscribeToPush = function() {
             console.log('🚀 subscribeToPush() çağrıldı!');
             
+            // Notification API kontrolü
+            if (!('Notification' in window)) {
+                console.error('❌ Notification API desteklenmiyor');
+                alert('❌ Tarayıcınız bildirim desteği sunmuyor.');
+                return Promise.reject('Notification API desteklenmiyor');
+            }
+            
             if (!('serviceWorker' in navigator)) {
                 console.error('❌ Service Worker desteklenmiyor');
                 alert('❌ Tarayıcınız bildirim desteği sunmuyor.');
                 return Promise.reject('Service Worker desteklenmiyor');
             }
+            
+            if (!('PushManager' in window)) {
+                console.error('❌ Push API desteklenmiyor');
+                alert('❌ Tarayıcınız push bildirimleri desteklemiyor.');
+                return Promise.reject('Push API desteklenmiyor');
+            }
 
-            console.log('✅ Service Worker destekleniyor, hazır olması bekleniyor...');
+            console.log('✅ Tüm API\'ler destekleniyor, Service Worker hazır olması bekleniyor...');
 
             return navigator.serviceWorker.ready.then(function(registration) {
                 console.log('✅ Service Worker hazır:', registration);
@@ -229,5 +242,3 @@
             });
         };
     </script>
-</body>
-</html>

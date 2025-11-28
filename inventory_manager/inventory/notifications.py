@@ -39,7 +39,7 @@ class LowStockNotificationService:
         self,
         group_name: str = "low_stock",
         threshold: int = 3,
-        cooldown_hours: int = 6,
+        cooldown_hours: int = 12,
         default_target_url: Optional[str] = None,
         icon_path: str = "/static/img/icons/icon-192x192.png",
     ) -> None:
@@ -61,7 +61,7 @@ class LowStockNotificationService:
 
     def build_payload(self, product: Product, target_url: Optional[str] = None) -> NotificationPayload:
         resolved_url = target_url or self.default_target_url
-        body = f"{product.name} ürününün stoğu {product.stock} adetin altına düştü."
+        body = f"{product.name} ürününün stoğu {product.stock} adete düştü."
         return NotificationPayload(
             head="Stok Uyarısı",
             body=body,
