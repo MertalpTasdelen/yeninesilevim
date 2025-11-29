@@ -76,3 +76,22 @@ class PushSubscription(models.Model):
             models.Index(fields=['endpoint']),
         ]
 
+
+class PurchaseItem(models.Model):
+    """Satın alınan ürünler için model"""
+    name = models.CharField("Ürün Adı", max_length=255)
+    purchase_barcode = models.CharField("Alış Barkodu", max_length=128, db_index=True)
+    purchase_price = models.DecimalField("Alış Fiyatı", max_digits=10, decimal_places=2)
+    quantity = models.PositiveIntegerField("Miktar", default=1)
+    image_url = models.CharField("Görsel URL", max_length=1024, blank=True, null=True)
+    created_at = models.DateTimeField("Oluşturulma Tarihi", auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.name} - {self.purchase_barcode}"
+
+    class Meta:
+        db_table = "purchase_items"
+        ordering = ['-created_at']
+        verbose_name = "Satın Alınan Ürün"
+        verbose_name_plural = "Satın Alınan Ürünler"
+

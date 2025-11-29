@@ -1,0 +1,603 @@
+/* ==========================================
+   MINIMALIST E-COMMERCE THEME
+   Inspired by Mango & Modern Fashion Brands
+   ========================================== */
+
+/* ========= CSS Variables (Design System) ========= */
+:root {
+    /* Spacing */
+    --spacing-xs: 8px;
+    --spacing-sm: 16px;
+    --spacing-md: 24px;
+    --spacing-lg: 40px;
+    --spacing-xl: 60px;
+    
+    /* Colors */
+    --color-primary: #2c2c2c;
+    --color-text: #2c2c2c;
+    --color-text-light: #666;
+    --color-text-muted: #999;
+    --color-border: #e5e5e5;
+    --color-bg: #ffffff;
+    --color-bg-light: #f8f8f8;
+    --color-overlay: rgba(0, 0, 0, 0.05);
+    
+    /* Typography */
+    --font-primary: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 0.9rem;
+    --font-size-md: 1rem;
+    --font-size-lg: 1.25rem;
+    --font-size-xl: 1.75rem;
+    --font-size-xxl: 2.5rem;
+    
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-bold: 600;
+    
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition: 0.3s ease;
+    --transition-slow: 0.5s ease;
+    
+    /* Borders */
+    --border-radius-sm: 2px;
+    --border-radius: 4px;
+    --border-radius-lg: 8px;
+    
+    /* Shadows */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* ========= Global Resets ========= */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font-primary);
+    font-size: var(--font-size-base);
+    color: var(--color-text);
+    background: var(--color-bg);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* ========= Typography ========= */
+h1, h2, h3, h4, h5, h6 {
+    font-weight: var(--font-weight-light);
+    letter-spacing: 0.5px;
+    margin-bottom: var(--spacing-md);
+}
+
+h1 { font-size: var(--font-size-xxl); }
+h2 { font-size: var(--font-size-xl); }
+h3 { font-size: var(--font-size-lg); }
+
+/* ========= Navbar (Minimalist) ========= */
+.navbar {
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--spacing-sm) var(--spacing-md);
+    box-shadow: none;
+}
+
+.navbar-brand {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-light);
+    letter-spacing: 1px;
+    color: var(--color-text) !important;
+    text-transform: uppercase;
+}
+
+.nav-link {
+    color: var(--color-text) !important;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0.5px;
+    padding: var(--spacing-xs) var(--spacing-sm) !important;
+    transition: var(--transition-fast);
+}
+
+.nav-link:hover {
+    color: var(--color-text-light) !important;
+}
+
+/* ========= Buttons (Minimalist) ========= */
+.btn {
+    padding: 10px 24px;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    border: none;
+    border-radius: 0;
+    transition: var(--transition);
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #000;
+}
+
+.btn-outline-secondary {
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    background: transparent;
+}
+
+.btn-outline-secondary:hover {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+/* ========= Cards (Product Cards) ========= */
+.card {
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    transition: var(--transition);
+    background: var(--color-bg);
+}
+
+.card:hover {
+    transform: translateY(-2px);
+}
+
+.card-img-top {
+    border-radius: 0;
+}
+
+.card-body {
+    padding: var(--spacing-sm) 0;
+}
+
+.card-title {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text);
+    margin-bottom: var(--spacing-xs);
+    line-height: 1.4;
+}
+
+.card-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
+    margin-bottom: var(--spacing-xs);
+}
+
+/* ========= Product Grid (Generic) ========= */
+.product-grid,
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--spacing-sm);
+    margin-bottom: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+    .product-grid,
+    .products-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-md);
+    }
+}
+
+@media (min-width: 1024px) {
+    .product-grid,
+    .products-grid {
+        grid-template-columns: repeat(4, 1fr);
+        gap: var(--spacing-md) var(--spacing-lg);
+    }
+}
+
+@media (min-width: 1400px) {
+    .product-grid,
+    .products-grid {
+        grid-template-columns: repeat(5, 1fr);
+    }
+}
+
+/* ========= Product Card (Generic) ========= */
+.product-card {
+    background: var(--color-bg);
+    transition: var(--transition);
+    position: relative;
+    cursor: pointer;
+}
+
+.product-card:hover {
+    transform: translateY(-2px);
+}
+
+.product-image-wrapper {
+    position: relative;
+    width: 100%;
+    padding-bottom: 133%; /* 3:4 portrait ratio */
+    overflow: hidden;
+    background: var(--color-bg-light);
+}
+
+.product-image {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition);
+}
+
+.product-card:hover .product-image {
+    transform: scale(1.05);
+}
+
+.product-image-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg-light);
+    color: var(--color-border);
+}
+
+/* ========= Product Overlay (Hover Actions) ========= */
+.product-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--color-overlay);
+    opacity: 0;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.product-card:hover .product-overlay {
+    opacity: 1;
+}
+
+.product-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.action-btn {
+    width: 40px;
+    height: 40px;
+    background: white;
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.action-btn:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+/* ========= Product Info ========= */
+.product-info {
+    padding: var(--spacing-sm) 0;
+}
+
+.product-category {
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--color-text-light);
+    margin-bottom: 4px;
+}
+
+.product-name {
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-normal);
+    color: var(--color-text);
+    margin-bottom: 8px;
+    line-height: 1.4;
+    height: 2.8em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.product-price {
+    font-size: var(--font-size-md);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+}
+
+/* ========= Forms (Minimalist) ========= */
+.form-control,
+.form-select {
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    padding: 12px 16px;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-fast);
+}
+
+.form-control:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: none;
+}
+
+/* ========= Input Groups ========= */
+.input-group {
+    border-radius: 0;
+}
+
+.input-group .form-control {
+    border-radius: 0;
+}
+
+.input-group .btn {
+    border-radius: 0;
+}
+
+/* ========= Search Bar (Centered) ========= */
+.search-wrapper {
+    margin-bottom: var(--spacing-lg);
+}
+
+.search-input-group {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+/* ========= Container (Max-width) ========= */
+.container-fashion {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: var(--spacing-md) var(--spacing-sm);
+}
+
+@media (min-width: 768px) {
+    .container-fashion {
+        padding: var(--spacing-lg) var(--spacing-md);
+    }
+}
+
+/* ========= Page Header ========= */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-lg);
+    padding-bottom: var(--spacing-md);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.page-title {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-light);
+    letter-spacing: 0.5px;
+    color: var(--color-text);
+    margin: 0;
+}
+
+/* ========= Pagination (Minimalist) ========= */
+.pagination {
+    gap: 8px;
+    justify-content: center;
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+}
+
+.page-link {
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    padding: 8px 16px;
+    border-radius: 0;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-fast);
+}
+
+.page-link:hover {
+    background: var(--color-primary);
+    color: white;
+    border-color: var(--color-primary);
+}
+
+.page-item.active .page-link {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: white;
+}
+
+/* ========= Badges (Minimalist) ========= */
+.badge {
+    padding: 4px 12px;
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    letter-spacing: 0.5px;
+    border-radius: var(--border-radius-sm);
+}
+
+.badge.bg-info {
+    background: var(--color-bg-light) !important;
+    color: var(--color-text);
+}
+
+/* ========= Mobile Controls ========= */
+.mobile-controls {
+    display: none;
+    margin-top: var(--spacing-sm);
+    gap: 8px;
+}
+
+.mobile-control-btn {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid var(--color-border);
+    background: white;
+    font-size: var(--font-size-sm);
+    transition: var(--transition-fast);
+}
+
+.mobile-control-btn:hover {
+    background: var(--color-primary);
+    color: white;
+}
+
+@media (max-width: 767px) {
+    .mobile-controls {
+        display: flex;
+    }
+    
+    .product-overlay {
+        display: none !important;
+    }
+}
+
+/* ========= Empty State ========= */
+.empty-state {
+    text-align: center;
+    padding: var(--spacing-lg) 0;
+    color: var(--color-text-light);
+}
+
+.empty-state i {
+    font-size: 4rem;
+    margin-bottom: var(--spacing-md);
+    color: var(--color-border);
+}
+
+/* ========= Stock Update Animation ========= */
+@keyframes stockUpdate {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.stock-updating {
+    animation: stockUpdate 0.5s ease;
+    font-weight: var(--font-weight-medium);
+    transition: color var(--transition);
+}
+
+/* ========= Alerts (Minimalist) ========= */
+.alert {
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+    padding: var(--spacing-md);
+}
+
+/* ========= Footer ========= */
+footer {
+    background: var(--color-bg-light);
+    border-top: 1px solid var(--color-border);
+    padding: var(--spacing-lg) 0;
+    margin-top: var(--spacing-xl);
+    font-size: var(--font-size-sm);
+    color: var(--color-text-light);
+}
+
+/* ========= Utility Classes ========= */
+.text-uppercase {
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.text-light {
+    color: var(--color-text-light) !important;
+}
+
+.text-muted {
+    color: var(--color-text-muted) !important;
+}
+
+.border-bottom {
+    border-bottom: 1px solid var(--color-border) !important;
+}
+
+/* ========= Smooth Transitions ========= */
+a, button, .card, .product-card {
+    transition: var(--transition);
+}
+
+/* ========= Form Groups ========= */
+.form-group {
+    margin-bottom: var(--spacing-md);
+}
+
+.form-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-text);
+    margin-bottom: 8px;
+    display: block;
+}
+
+.form-row {
+    display: flex;
+    gap: var(--spacing-md);
+}
+
+@media (max-width: 767px) {
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+}
+
+.form-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+}
+
+@media (max-width: 767px) {
+    .form-actions {
+        flex-direction: column;
+    }
+}
+
+.form-container {
+    background: white;
+    padding: var(--spacing-lg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--border-radius);
+}
+
+/* ========= Color Variables ========= */
+:root {
+    --color-background: #f8f8f8;
+}
+
+/* ========= Legacy Card Styles (Keep for compatibility) ========= */
+.no-image {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 160px;
+    background-color: var(--color-bg-light);
+    color: var(--color-text-muted);
+    border-radius: 0;
+    font-size: var(--font-size-sm);
+}

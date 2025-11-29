@@ -3,123 +3,128 @@
 {% block title %}Kâr Hesaplama{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Kâr Hesaplama</h2>
-    <form id="profit-form" method="POST" action="{% url 'save_profit_calculation' %}">
-        {% csrf_token %}
-        <div class="mb-3">
-            <label for="barcode" class="form-label">Barkod</label>
-            <input type="text" id="barcode" name="barcode" class="form-control" value="{{ barcode }}" readonly>
-        </div>
-        <div class="mb-3">
-            <label for="selling-price" class="form-label">Satış Fiyatı</label>
-            <input type="number" class="form-control" id="selling-price" name="selling_price" placeholder="Satış Fiyatı"
-                value="{{ selling_price }}" required>
-        </div>
-
-        {% if request.session.is_logged_in %}
-        <div class="mb-3">
-            <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
-            <input type="number" class="form-control" id="commission-rate" name="commution" placeholder="Komisyon Oranı"
-                value="{{ commution }}" required>
-        </div>
-        <div class="mb-3">
-            <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti</label>
-            <input type="number" class="form-control" id="purchase-cost" name="purchase_cost" placeholder="Maliyet"
-                required>
-        </div>
-        <div class="mb-3">
-            <label for="shipping-cost" class="form-label">Kargo Maliyeti</label>
-            <input type="number" class="form-control" id="shipping-cost" name="shipping_cost"
-                placeholder="Kargo Maliyeti" required>
-        </div>
-        <div class="mb-3">
-            <label for="packaging-cost" class="form-label">Paketleme Maliyeti</label>
-            <input type="number" class="form-control" id="packaging-cost" name="packaging_cost"
-                placeholder="Paketleme Maliyeti" required>
-        </div>
-        <div class="mb-3">
-            <label for="other-costs" class="form-label">Diğer Maliyetler</label>
-            <input type="number" class="form-control" id="other-costs" name="other_costs" placeholder="Diğer Maliyetler"
-                required>
-        </div>
-        <div class="mb-3">
-            <label for="vat-rate" class="form-label">KDV Oranı (%)</label>
-            <input type="number" class="form-control" id="vat-rate" name="vat_rate" placeholder="KDV Oranı" required>
-        </div>
-
-        <button type="button" class="btn btn-success" onclick="calculateProfit()">Hesapla</button>
-        <button type="button" class="btn btn-secondary" onclick="clearForm()">Temizle</button>
-        <button type="submit" class="btn btn-primary">Ekle</button>
-        {% else %}
-        <div class="alert alert-warning">
-            Detaylı kâr hesaplaması yapabilmek için giriş yapmanız gerekmektedir.
-        </div>
-        {% endif %}
-    </form>
-
-    {% if request.session.is_logged_in %}
-    <div class="mt-4">
-        <h4>Sonuçlar</h4>
-        <p>Ödediğiniz Komisyon: <span id="paid-commission">0</span> TL</p>
-        <p>Ödediğiniz KDV: <span id="paid-vat">0</span> TL</p>
-        <p>Toplam Maliyet: <span id="total-cost">0</span> TL</p>
-        <p>Net Kâr: <span id="net-profit">0</span> TL</p>
-        <p>Yüzde Kâr: <span id="profit-margin">0</span>%</p>
+<div class="container-fashion">
+    <div class="page-header">
+        <h1 class="page-title">Kâr Hesaplama</h1>
+        <a href="{% url 'profit_calculator_list' %}" class="btn btn-secondary">
+            <i class="bi bi-list"></i> Kayıtlar
+        </a>
     </div>
-    {% endif %}
-</div>
+
+    <div class="form-container" style="max-width: 600px; margin: 0 auto;">
+        <form id="profit-form" method="POST" action="{% url 'save_profit_calculation' %}">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="barcode" class="form-label">Barkod</label>
+                <input type="text" id="barcode" name="barcode" class="form-control" value="{{ barcode }}" readonly>
+            </div>
+            
+            <div class="form-group">
+                <label for="selling-price" class="form-label">Satış Fiyatı (₺)</label>
+                <input type="number" class="form-control" id="selling-price" name="selling_price" 
+                       placeholder="0.00" value="{{ selling_price }}" step="0.01" required>
+            </div>
+
+            {% if request.session.is_logged_in %}
+            <div class="form-group">
+                <label for="commission-rate" class="form-label">Komisyon Oranı (%)</label>
+                <input type="number" class="form-control" id="commission-rate" name="commution" 
+                       placeholder="0.0" value="{{ commution }}" step="0.01" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti (₺)</label>
+                <input type="number" class="form-control" id="purchase-cost" name="purchase_cost" 
+                       placeholder="0.00" step="0.01" required>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="shipping-cost" class="form-label">Kargo Maliyeti (₺)</label>
+                    <input type="number" class="form-control" id="shipping-cost" name="shipping_cost"
+                           placeholder="0.00" step="0.01" required>
+                </div>
+                
+                <div class="form-group" style="flex: 1; margin-left: var(--spacing-md);">
+                    <label for="packaging-cost" class="form-label">Paketleme Maliyeti (₺)</label>
+                    <input type="number" class="form-control" id="packaging-cost" name="packaging_cost"
+                           placeholder="0.00" step="0.01" required>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label for="other-costs" class="form-label">Diğer Maliyetler (₺)</label>
+                    <input type="number" class="form-control" id="other-costs" name="other_costs" 
+                           placeholder="0.00" step="0.01" required>
+                </div>
+                
+                <div class="form-group" style="flex: 1; margin-left: var(--spacing-md);">
+                    <label for="vat-rate" class="form-label">KDV Oranı (%)</label>
+                    <input type="number" class="form-control" id="vat-rate" name="vat_rate" 
+                           placeholder="0.0" step="0.01" required>
+                </div>
+            </div>
+
+            <div class="form-actions" style="gap: var(--spacing-sm);">
+                <button type="button" class="btn btn-primary" onclick="calculateProfit()">Hesapla</button>
+                <button type="submit" class="btn btn-success">Kaydet</button>
+                <button type="button" class="btn btn-secondary" onclick="clearForm()">Temizle</button>
+            </div>
+
+            <div class="results-container" style="margin-top: var(--spacing-lg); padding: var(--spacing-md); background: var(--color-background); border: 1px solid var(--color-border); border-radius: 4px;">
+                <h4 style="margin-bottom: var(--spacing-md); font-size: 1rem; font-weight: 500;">Sonuçlar</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacing-sm); font-size: 0.875rem;">
+                    <div>Ödediğiniz Komisyon:</div><div><strong><span id="paid-commission">0</span> ₺</strong></div>
+                    <div>Ödediğiniz KDV:</div><div><strong><span id="paid-vat">0</span> ₺</strong></div>
+                    <div>Toplam Maliyet:</div><div><strong><span id="total-cost">0</span> ₺</strong></div>
+                    <div style="color: var(--color-primary); font-weight: 600;">Net Kâr:</div>
+                    <div style="color: var(--color-primary); font-weight: 600;"><strong><span id="net-profit">0</span> ₺</strong></div>
+                    <div style="color: var(--color-primary); font-weight: 600;">Yüzde Kâr:</div>
+                    <div style="color: var(--color-primary); font-weight: 600;"><strong><span id="profit-margin">0</span>%</strong></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning">
+                Detaylı kâr hesaplaması yapabilmek için giriş yapmanız gerekmektedir.
+            </div>
+            {% endif %}
+        </form>
+    </div>
 </div>
 
 <script>
-    function calculateProfit() {
-        // Kullanıcı girişlerini al
-        const sellingPrice = parseFloat(document.getElementById('selling-price').value);
-        const commissionRate = parseFloat(document.getElementById('commission-rate').value) / 100;
-        const purchaseCost = parseFloat(document.getElementById('purchase-cost').value);
-        const shippingCost = parseFloat(document.getElementById('shipping-cost').value);
-        const packagingCost = parseFloat(document.getElementById('packaging-cost').value);
-        const otherCosts = parseFloat(document.getElementById('other-costs').value);
-        const vatRate = parseFloat(document.getElementById('vat-rate').value) / 100;
+function calculateProfit() {
+    const sellingPrice = parseFloat(document.getElementById('selling-price').value) || 0;
+    const commissionRate = parseFloat(document.getElementById('commission-rate').value) / 100 || 0;
+    const purchaseCost = parseFloat(document.getElementById('purchase-cost').value) || 0;
+    const shippingCost = parseFloat(document.getElementById('shipping-cost').value) || 0;
+    const packagingCost = parseFloat(document.getElementById('packaging-cost').value) || 0;
+    const otherCosts = parseFloat(document.getElementById('other-costs').value) || 0;
+    const vatRate = parseFloat(document.getElementById('vat-rate').value) / 100 || 0;
 
-        // Ödediğiniz Komisyon
-        const paidCommission = sellingPrice * commissionRate;
+    const paidCommission = sellingPrice * commissionRate;
+    const totalCost = purchaseCost + shippingCost + packagingCost + otherCosts + paidCommission;
+    const paidVat = (sellingPrice * vatRate) - (totalCost * vatRate);
+    const netProfit = sellingPrice - totalCost - paidVat - commissionRate;
+    const profitMargin = totalCost > 0 ? (netProfit / totalCost) * 100 : 0;
 
-        // Toplam Maliyet
-        const totalCost = (purchaseCost + shippingCost + packagingCost + otherCosts + paidCommission);
+    document.getElementById('paid-commission').innerText = paidCommission.toFixed(2);
+    document.getElementById('paid-vat').innerText = paidVat.toFixed(2);
+    document.getElementById('total-cost').innerText = totalCost.toFixed(2);
+    document.getElementById('net-profit').innerText = netProfit.toFixed(2);
+    document.getElementById('profit-margin').innerText = profitMargin.toFixed(2);
+}
 
-        // Ödediğiniz KDV
-        const paidVat = (sellingPrice * vatRate) - (totalCost * vatRate);
-
-        // Net Kâr
-        const netProfit = sellingPrice - totalCost - paidVat - commissionRate
-
-        // Yüzde Kâr
-        const profitMargin = (netProfit / totalCost) * 100;
-
-        // Sonuçları güncelle
-        document.getElementById('paid-commission').innerText = paidCommission.toFixed(2);
-        document.getElementById('paid-vat').innerText = paidVat.toFixed(2);
-        document.getElementById('total-cost').innerText = totalCost.toFixed(2);
-        document.getElementById('net-profit').innerText = netProfit.toFixed(2);
-        document.getElementById('profit-margin').innerText = profitMargin.toFixed(2);
-    }
-
-    function clearForm() {
-        document.getElementById('selling-price').value = '';
-        document.getElementById('commission-rate').value = '';
-        document.getElementById('purchase-cost').value = '';
-        document.getElementById('shipping-cost').value = '';
-        document.getElementById('packaging-cost').value = '';
-        document.getElementById('other-costs').value = '';
-        document.getElementById('vat-rate').value = '';
-
-        document.getElementById('paid-commission').innerText = '0';
-        document.getElementById('paid-vat').innerText = '0';
-        document.getElementById('total-cost').innerText = '0';
-        document.getElementById('net-profit').innerText = '0';
-        document.getElementById('profit-margin').innerText = '0';
-    }
+function clearForm() {
+    ['selling-price', 'commission-rate', 'purchase-cost', 'shipping-cost', 
+     'packaging-cost', 'other-costs', 'vat-rate'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    ['paid-commission', 'paid-vat', 'total-cost', 'net-profit', 'profit-margin'].forEach(id => {
+        document.getElementById(id).innerText = '0';
+    });
+}
 </script>
-
 {% endblock %}

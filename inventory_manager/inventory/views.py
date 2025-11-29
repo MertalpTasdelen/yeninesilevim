@@ -3,7 +3,7 @@ from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.urls import reverse
-from .models import Product, ProfitCalculator
+from .models import Product, ProfitCalculator, PurchaseItem
 from .forms import ProductForm
 from .notifications import LowStockNotificationService
 from .trendyol_integration import (
@@ -588,3 +588,142 @@ def test_notification(request):
             'success': False,
             'error': str(e)
         }, status=500)
+
+
+# ===== PurchaseItem Views =====
+
+def purchase_items_list(request):
+    """Satın alınan ürünlerin listesini gösterir"""
+    query = request.GET.get('q', '')
+    page = request.GET.get('page', 1)
+
+    items = PurchaseItem.objects.all()
+
+    if query:
+        items = items.filter(
+            name__icontains=query
+        ) | items.filter(
+            purchase_barcode__icontains=query
+        )
+
+    paginator = Paginator(items, 20)
+    page_obj = paginator.get_page(page)
+
+    return render(request, 'inventory/purchase_items_list.html', {
+        'page_obj': page_obj,
+        'query': query
+    })
+
+
+def add_purchase_item(request):
+    """Yeni satın alınan ürün ekler"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return login_redirect
+
+    if request.method == 'POST':
+        try:
+            name = request.POST.get('name')
+            purchase_barcode = request.POST.get('purchase_barcode')
+            purchase_price = request.POST.get('purchase_price')
+            quantity = request.POST.get('quantity', 1)
+            image_url = request.POST.get('image_url', '')
+
+            # Validasyon
+            if not all([name, purchase_barcode, purchase_price]):
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Lütfen tüm gerekli alanları doldurun!'
+                }, status=400)
+
+            # Ürün oluştur veya güncelle
+            item, created = PurchaseItem.objects.update_or_create(
+                purchase_barcode=purchase_barcode,
+                defaults={
+                    'name': name,
+                    'purchase_price': purchase_price,
+                    'quantity': quantity,
+                    'image_url': image_url or None
+                }
+            )
+
+            return JsonResponse({
+                'success': True,
+                'message': 'Ürün başarıyla eklendi!' if created else 'Ürün güncellendi!',
+                'item': {
+                    'id': item.id,
+                    'name': item.name,
+                    'purchase_barcode': item.purchase_barcode,
+                    'purchase_price': str(item.purchase_price),
+                    'quantity': item.quantity
+                }
+            })
+
+        except Exception as e:
+            logger.error(f'Purchase item add error: {e}', exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'message': f'Hata: {str(e)}'
+            }, status=500)
+
+    return render(request, 'inventory/add_purchase_item.html')
+
+
+def adjust_purchase_quantity(request, item_id, amount):
+    """Satın alınan ürünün miktarını ayarlar"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return JsonResponse({'success': False, 'message': 'Giriş gerekli'}, status=401)
+
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(PurchaseItem, id=item_id)
+            item.quantity += int(amount)
+            
+            if item.quantity < 0:
+                item.quantity = 0
+            
+            item.save()
+            
+            return JsonResponse({
+                'success': True,
+                'quantity': item.quantity
+            })
+        except Exception as e:
+            logger.error(f'Purchase item adjust error: {e}', exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'message': f'Hata: {str(e)}'
+            }, status=500)
+
+    return JsonResponse({
+        'success': False,
+        'message': 'Geçersiz istek!'
+    }, status=400)
+
+
+def delete_purchase_item(request, item_id):
+    """Satın alınan ürünü siler"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return login_redirect
+
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(PurchaseItem, id=item_id)
+            item.delete()
+            return JsonResponse({
+                'success': True,
+                'message': 'Ürün başarıyla silindi!'
+            })
+        except Exception as e:
+            logger.error(f'Purchase item delete error: {e}', exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'message': f'Hata: {str(e)}'
+            }, status=500)
+
+    return JsonResponse({
+        'success': False,
+        'message': 'Geçersiz istek!'
+    }, status=400)

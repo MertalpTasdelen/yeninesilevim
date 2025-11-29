@@ -1,22 +1,35 @@
 {% extends 'base.html' %}
 
-{% block title %}Login{% endblock %}
+{% block title %}Giriş{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Login</h2>
-    <form method="POST" action="{% url 'login' %}">
-        {% csrf_token %}
-        <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" class="form-control" id="password" name="password" placeholder="Enter password" required>
-        </div>
-        {% if error %}
-        <div class="alert alert-danger" role="alert">
-            {{ error }}
-        </div>
-        {% endif %}
-        <button type="submit" class="btn btn-primary">Login</button>
-    </form>
+<div class="container-fashion">
+    <div class="login-container" style="max-width: 400px; margin: 100px auto; text-align: center;">
+        <h1 class="page-title" style="margin-bottom: var(--spacing-lg);">Giriş</h1>
+        
+        <form method="POST" action="{% url 'login' %}">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="password" class="form-label">Şifre</label>
+                <input type="password" 
+                       class="form-control" 
+                       id="password" 
+                       name="password" 
+                       placeholder="Şifrenizi girin" 
+                       required
+                       style="text-align: center;">
+            </div>
+            
+            {% if error %}
+            <div class="alert alert-danger" role="alert" style="margin-top: var(--spacing-md);">
+                {{ error }}
+            </div>
+            {% endif %}
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: var(--spacing-md);">
+                Giriş Yap
+            </button>
+        </form>
+    </div>
 </div>
 {% endblock %}

@@ -3,73 +3,90 @@
 {% block title %}Kâr Hesaplama Kayıtları{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Kâr Hesaplama Kayıtları</h2>
-    <div class="table-responsive">
-        <table class="table table-bordered table-hover">
-            <thead class="table-dark">
+<div class="container-fashion">
+    <div class="page-header">
+        <h1 class="page-title">Kâr Hesaplama Kayıtları</h1>
+        <a href="{% url 'profit_calculator' %}" class="btn btn-primary">
+            <i class="bi bi-calculator"></i> Yeni Hesaplama
+        </a>
+    </div>
+
+    <div class="table-responsive" style="background: white; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden;">
+        <table class="table" style="margin: 0;">
+            <thead style="background: var(--color-background); border-bottom: 2px solid var(--color-border);">
                 <tr>
-                    <th>Barkod</th>
-                    <th>Satış Fiyatı (TL)</th>
-                    {# Only show purchase cost header if user is logged in #}
+                    <th style="padding: var(--spacing-md); font-weight: 500; color: var(--color-primary);">Barkod</th>
+                    <th style="padding: var(--spacing-md); font-weight: 500; color: var(--color-primary);">Satış Fiyatı</th>
                     {% if request.session.is_logged_in %}
-                        <th>Alış Fiyatı (TL)</th>
+                    <th style="padding: var(--spacing-md); font-weight: 500; color: var(--color-primary);">Alış Fiyatı</th>
                     {% endif %}
-                    <th>Net Kâr (TL)</th>
-                    <th>İşlemler</th>
+                    <th style="padding: var(--spacing-md); font-weight: 500; color: var(--color-primary);">Net Kâr</th>
+                    <th style="padding: var(--spacing-md); font-weight: 500; color: var(--color-primary);">İşlemler</th>
                 </tr>
             </thead>
             <tbody>
                 {% for record in records %}
-                <tr class="expandable-row" data-barcode="{{ record.barcode }}">
-                    <td class="barcode-cell" data-barcode="{{ record.barcode }}">{{ record.barcode }}</td>
-                    <td>{{ record.selling_price }}</td>
-                    {# Show purchase cost value or a placeholder if not logged in #}
+                <tr class="expandable-row" data-barcode="{{ record.barcode }}" 
+                    style="border-bottom: 1px solid var(--color-border); cursor: pointer; transition: background-color 0.2s;">
+                    <td class="barcode-cell" data-barcode="{{ record.barcode }}" 
+                        style="padding: var(--spacing-md); position: relative;">
+                        {{ record.barcode }}
+                    </td>
+                    <td style="padding: var(--spacing-md);">{{ record.selling_price }} ₺</td>
                     {% if request.session.is_logged_in %}
-                        <td>{{ record.purchase_cost }}</td>
+                    <td style="padding: var(--spacing-md);">{{ record.purchase_cost }} ₺</td>
                     {% endif %}
-                    <td>{{ record.net_profit }}</td>
-                    <td>
+                    <td style="padding: var(--spacing-md); font-weight: 500; color: #10b981;">{{ record.net_profit }} ₺</td>
+                    <td style="padding: var(--spacing-md);">
                         {% if request.session.is_logged_in %}
-                            <button class="btn btn-danger btn-sm delete-button" data-id="{{ record.id }}">Sil</button>
-                        {% else %}
-                            <button class="btn btn-danger btn-sm delete-button disabled" data-id="{{ record.id }}">Sil</button>
+                        <button class="btn btn-danger btn-sm delete-button" data-id="{{ record.id }}">
+                            <i class="bi bi-trash"></i>
+                        </button>
                         {% endif %}
                     </td>
                 </tr>
-                {# Expanded content row - only visible when clicked.  Sensitive details are only rendered for logged-in users. #}
-                <tr class="expanded-content" style="display: none;">
-                    <td colspan="5">
-                        <div class="expanded-details">
+                <tr class="expanded-content" style="display: none; background: var(--color-background);">
+                    <td colspan="5" style="padding: var(--spacing-md);">
+                        <div class="expanded-details" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-sm); font-size: 0.875rem;">
                             {% if request.session.is_logged_in %}
-                                <p><strong>Satış Fiyatı (TL):</strong> {{ record.selling_price }}</p>
-                                <p><strong>Alış Maliyeti (TL):</strong> {{ record.purchase_cost }}</p>
-                                <p><strong>Kargo Maliyeti (TL):</strong> {{ record.shipping_cost }}</p>
-                                <p><strong>Paketleme Maliyeti (TL):</strong> {{ record.packaging_cost }}</p>
-                                <p><strong>Diğer Maliyetler (TL):</strong> {{ record.other_costs }}</p>
-                                <p><strong>KDV Oranı (%):</strong> {{ record.vat_rate }}</p>
-                                <p><strong>Ödediğiniz Komisyon (TL):</strong> {{ record.paid_commission }}</p>
-                                <p><strong>Ödediğiniz KDV (TL):</strong> {{ record.paid_vat }}</p>
-                                <p><strong>Toplam Maliyet (TL):</strong> {{ record.total_cost }}</p>
-                                <p><strong>Oluşturulma Tarihi:</strong> {{ record.created_at }}</p>
+                            <div><strong>Satış Fiyatı:</strong> {{ record.selling_price }} ₺</div>
+                            <div><strong>Alış Maliyeti:</strong> {{ record.purchase_cost }} ₺</div>
+                            <div><strong>Kargo Maliyeti:</strong> {{ record.shipping_cost }} ₺</div>
+                            <div><strong>Paketleme Maliyeti:</strong> {{ record.packaging_cost }} ₺</div>
+                            <div><strong>Diğer Maliyetler:</strong> {{ record.other_costs }} ₺</div>
+                            <div><strong>KDV Oranı:</strong> {{ record.vat_rate }}%</div>
+                            <div><strong>Ödenen Komisyon:</strong> {{ record.paid_commission }} ₺</div>
+                            <div><strong>Ödenen KDV:</strong> {{ record.paid_vat }} ₺</div>
+                            <div><strong>Toplam Maliyet:</strong> {{ record.total_cost }} ₺</div>
+                            <div><strong>Oluşturulma:</strong> {{ record.created_at|date:"d.m.Y H:i" }}</div>
                             {% else %}
-                                <p class="text-muted">Detaylar görüntülenebilmesi için giriş yapınız.</p>
+                            <p style="color: var(--color-text-light);">Detaylar için giriş yapınız.</p>
                             {% endif %}
                         </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="text-center">Kayıt bulunamadı.</td>
+                    <td colspan="5" style="padding: var(--spacing-lg); text-align: center; color: var(--color-text-light);">
+                        Henüz kayıt bulunmuyor.
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
-    <div id="product-image-container" style="display: none; position: absolute;">
-        <img id="product-image" src="" alt="Product Image" style="max-width: 200px; max-height: 200px;">
+    
+    <div id="product-image-container" style="display: none; position: absolute; z-index: 1000; pointer-events: none;">
+        <img id="product-image" src="" alt="Product Image" 
+             style="max-width: 200px; max-height: 200px; border: 2px solid var(--color-border); border-radius: 4px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
     </div>
 </div>
+
+<style>
+.expandable-row:hover {
+    background-color: var(--color-background) !important;
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -105,14 +122,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const expandableRows = document.querySelectorAll('.expandable-row');
     expandableRows.forEach(row => {
-        row.addEventListener('click', function() {
+        row.addEventListener('click', function(e) {
+            if (e.target.closest('.delete-button')) return;
+            
             const expandedContent = this.nextElementSibling;
             if (expandedContent.style.display === 'none' || expandedContent.style.display === '') {
                 expandedContent.style.display = 'table-row';
-                expandedContent.classList.add('expand-animation');
             } else {
                 expandedContent.style.display = 'none';
-                expandedContent.classList.remove('expand-animation');
             }
         });
     });
@@ -120,10 +137,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const deleteButtons = document.querySelectorAll('.delete-button');
     deleteButtons.forEach(button => {
         button.addEventListener('click', function(event) {
-            if (this.classList.contains('disabled')) {
-                // Prevent deletion if button is disabled
-                return;
-            }
+            event.stopPropagation();
             if (confirm('Bu kaydı silmek istediğinizden emin misiniz?')) {
                 const recordId = this.dataset.id;
                 fetch(`/delete_profit_calculation/${recordId}/`, {

@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Satın Alınan Ürünler{% endblock %}
+
+{% block content %}
+<div class="container-fashion">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">Satın Alınan Ürünler</h1>
+        {% if request.session.is_logged_in %}
+        <a href="{% url 'add_purchase_item' %}" class="btn btn-primary">
+            + Yeni Ürün
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-wrapper">
+        <form method="GET" action="{% url 'purchase_items_list' %}">
+            <div class="input-group search-input-group">
+                <input type="text" 
+                       class="form-control" 
+                       name="q" 
+                       placeholder="Ürün adı veya barkod ile ara..." 
+                       value="{{ query }}">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-search"></i>
+                </button>
+                {% if query %}
+                <a href="{% url 'purchase_items_list' %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Products Grid -->
+    <div class="products-grid">
+        {% for item in page_obj %}
+        <div class="product-card" id="item-card-{{ item.id }}">
+            <!-- Product Image -->
+            <div class="product-image-wrapper">
+                {% if item.image_url %}
+                <img src="{{ item.image_url }}" 
+                     class="product-image" 
+                     alt="{{ item.name }}"
+                     onerror="this.parentElement.innerHTML='<div class=\'product-image-placeholder\'><i class=\'bi bi-image\' style=\'font-size: 3rem;\'></i></div>'">
+                {% else %}
+                <div class="product-image-placeholder">
+                    <i class="bi bi-image" style="font-size: 3rem;"></i>
+                </div>
+                {% endif %}
+                
+                <!-- Hover Overlay (Desktop only) -->
+                {% if request.session.is_logged_in %}
+                <div class="product-overlay">
+                    <div class="product-actions">
+                        <button class="action-btn" 
+                                onclick="adjustQuantity({{ item.id }}, 1); event.stopPropagation();" 
+                                title="Artır">
+                            <i class="bi bi-plus"></i>
+                        </button>
+                        <button class="action-btn" 
+                                onclick="adjustQuantity({{ item.id }}, -1); event.stopPropagation();" 
+                                title="Azalt">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <button class="action-btn" 
+                                onclick="deletePurchaseItem({{ item.id }}); event.stopPropagation();"
+                                title="Sil">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Product Info -->
+            <div class="product-info">
+                <div class="product-category">{{ item.purchase_barcode }}</div>
+                <div class="product-name">{{ item.name }}</div>
+                <div>
+                    <span class="product-price">{{ item.purchase_price }} ₺</span>
+                    <span class="badge bg-info" id="quantity-{{ item.id }}">{{ item.quantity }} adet</span>
+                </div>
+                
+                <!-- Mobile Controls -->
+                {% if request.session.is_logged_in %}
+                <div class="mobile-controls">
+                    <button class="mobile-control-btn" onclick="adjustQuantity({{ item.id }}, 1)">
+                        <i class="bi bi-plus"></i>
+                    </button>
+                    <button class="mobile-control-btn" onclick="adjustQuantity({{ item.id }}, -1)">
+                        <i class="bi bi-dash"></i>
+                    </button>
+                    <button class="mobile-control-btn" onclick="deletePurchaseItem({{ item.id }})">
+                        <i class="bi bi-trash"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="empty-state">
+                <i class="bi bi-bag-x"></i>
+                <p>Henüz ürün eklenmedi.</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Page navigation">
+        <ul class="pagination">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ query }}">Önceki</a>
+            </li>
+            {% endif %}
+
+            {% for num in page_obj.paginator.page_range %}
+            {% if page_obj.number == num %}
+            <li class="page-item active">
+                <span class="page-link">{{ num }}</span>
+            </li>
+            {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ num }}&q={{ query }}">{{ num }}</a>
+            </li>
+            {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ query }}">Sonraki</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function adjustQuantity(itemId, amount) {
+    fetch(`/purchase-items/adjust/${itemId}/${amount}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const quantityBadge = document.getElementById(`quantity-${itemId}`);
+            if (quantityBadge) {
+                quantityBadge.textContent = data.quantity + ' adet';
+                quantityBadge.classList.add('stock-updating');
+                setTimeout(() => quantityBadge.classList.remove('stock-updating'), 500);
+            }
+        } else {
+            alert('Hata: ' + (data.message || 'Miktar güncellenemedi'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu!');
+    });
+}
+
+function deletePurchaseItem(itemId) {
+    if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) {
+        return;
+    }
+
+    fetch(`/purchase-items/delete/${itemId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const card = document.getElementById(`item-card-${itemId}`);
+            if (card) {
+                card.style.opacity = '0';
+                card.style.transform = 'scale(0.8)';
+                setTimeout(() => card.remove(), 300);
+            }
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu!');
+    });
+}
+</script>
+{% endblock %}

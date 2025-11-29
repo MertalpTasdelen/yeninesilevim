@@ -1,53 +1,56 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Ürün Listesi</h2>
-    <div class="mb-3">
-        <button id="enableNotifications" class="btn btn-outline-warning" onclick="subscribeToPush()">
-            <i class="bi bi-bell"></i> Stok Uyarılarını Aktif Et
-        </button>
-        <button id="testNotification" class="btn btn-outline-info ms-2" onclick="testNotification()">
-            <i class="bi bi-send"></i> Test Bildirimi Gönder
-        </button>
-    </div>
-    <form method="GET" action="{% url 'product_list' %}" class="mb-4">
-        <div class="input-group mb-3">
-            <input type="text" id="search-input" name="q" class="form-control"
-                placeholder="Ürün adı, barkod veya alış barkodu ile ara..." value="{{ query|default_if_none:'' }}"
-                aria-label="Search products" aria-describedby="filter-icon">
-            <button type="button" class="btn btn-outline-secondary" id="openSearchCamera"
-                title="Kamera ile barkod tara">
-                <i class="bi bi-camera"></i>
+<div class="container-fashion">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">İlanlar</h1>
+        <div>
+            <button id="enableNotifications" class="btn btn-outline-secondary me-2" onclick="subscribeToPush()">
+                <i class="bi bi-bell"></i> Bildirimler
+            </button>
+            <button id="testNotification" class="btn btn-outline-secondary" onclick="testNotification()">
+                <i class="bi bi-send"></i> Test
             </button>
         </div>
-        <div class="input-group mb-3">
-            <span class="input-group-text" id="filter-icon">
-                <i class="fas fa-filter"></i>
-            </span>
-            <select class="form-select" id="sort-by" name="sort_by">
-                <option value="" {% if not sort_by %}selected{% endif %}>Sıralama seçin</option>
-                <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stoğa göre azalan</option>
-                <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stoğa göre artan</option>
-                <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Satış
-                    fiyatına göre azalan</option>
-                <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Satış
-                    fiyatına göre artan</option>
-            </select>
-        </div>
-    </form>
-    <!-- ✅ Success toast for scanned barcode -->
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="search-wrapper">
+        <form method="GET" action="{% url 'product_list' %}">
+            <div class="input-group search-input-group mb-3">
+                <input type="text" id="search-input" name="q" class="form-control"
+                    placeholder="Ürün adı, barkod veya alış barkodu ile ara..." value="{{ query|default_if_none:'' }}"
+                    aria-label="Search products">
+                <button type="button" class="btn btn-outline-secondary" id="openSearchCamera"
+                    title="Kamera ile barkod tara">
+                    <i class="bi bi-camera"></i>
+                </button>
+            </div>
+            <div class="input-group search-input-group">
+                <select class="form-select" id="sort-by" name="sort_by">
+                    <option value="" {% if not sort_by %}selected{% endif %}>Sıralama seçin</option>
+                    <option value="stock_desc" {% if sort_by == 'stock_desc' %}selected{% endif %}>Stoğa göre azalan</option>
+                    <option value="stock_asc" {% if sort_by == 'stock_asc' %}selected{% endif %}>Stoğa göre artan</option>
+                    <option value="selling_price_desc" {% if sort_by == 'selling_price_desc' %}selected{% endif %}>Fiyata göre azalan</option>
+                    <option value="selling_price_asc" {% if sort_by == 'selling_price_asc' %}selected{% endif %}>Fiyata göre artan</option>
+                </select>
+            </div>
+        </form>
+    </div>
+
+    <!-- Success toast -->
     <div id="scanSuccessToast" class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3"
          role="alert" aria-live="assertive" aria-atomic="true" style="display:none;">
         <div class="d-flex">
-            <div class="toast-body">
-                Barkod başarıyla okundu!
-            </div>
+            <div class="toast-body">Barkod başarıyla okundu!</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto"
                     aria-label="Kapat" onclick="this.closest('.toast').style.display='none'"></button>
         </div>
     </div>
-    <div id="product-list" class="row">
+
+    <!-- Products Grid -->
+    <div id="product-list" class="products-grid">
         {% include 'inventory/product_list_results.html' %}
     </div>
 </div>
@@ -130,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
             checkAuthButtons();
         })
         .catch(err => {
-            console.error('Ürün listesi yüklenirken hata oluştu:', err);
+            console.error('Ilanlar yüklenirken hata oluştu:', err);
         })
         .finally(() => {
             loading = false;
@@ -332,6 +335,49 @@ function calculatePrice(barcode, sellingPrice, commution) {
 }
 
 /**
+ * AJAX stock adjustment for product cards
+ */
+function adjustStockAjax(productId, amount) {
+    fetch(`/adjust-stock/${productId}/${amount}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.stock !== undefined) {
+            const stockElement = document.getElementById(`stock-${productId}`);
+            if (stockElement) {
+                stockElement.textContent = data.stock;
+                stockElement.classList.add('stock-updating');
+                setTimeout(() => stockElement.classList.remove('stock-updating'), 500);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Stok güncellenirken hata:', error);
+        alert('Stok güncellenemedi. Lütfen tekrar deneyin.');
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+/**
  * Test notification - sends a test push notification for low stock products
  */
 function testNotification() {
@@ -350,7 +396,7 @@ function testNotification() {
         if (data.success) {
             let message = data.message;
             if (data.products && data.products.length > 0) {
-                message += '\n\n📦 Ürünler:\n' + data.products.join('\n');
+                message += '\n\n📦 İlanlar:\n' + data.products.join('\n');
             }
             if (data.subscription_count !== undefined) {
                 message += '\n\n📊 İstatistikler:';
@@ -391,7 +437,7 @@ function testNotification() {
         if (data.success) {
             let message = data.message;
             if (data.products && data.products.length > 0) {
-                message += '\n\n📦 Ürünler:\n' + data.products.join('\n');
+                message += '\n\n📦 İlanlar:\n' + data.products.join('\n');
             }
             if (data.subscription_count !== undefined) {
                 message += '\n\n📊 İstatistikler:';

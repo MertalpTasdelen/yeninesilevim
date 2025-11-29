@@ -1,70 +1,75 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">{{ form.instance.id|yesno:"Ürünü Düzenle,Yeni Ürün Ekle" }}</h2>
+<div class="container-fashion">
+    <div class="page-header">
+        <h1 class="page-title">{{ form.instance.id|yesno:"Ürünü Düzenle,Yeni Ürün Ekle" }}</h1>
+    </div>
 
-    <form method="post">
-        {% csrf_token %}
+    <div class="form-container" style="max-width: 700px; margin: 0 auto;">
+        <form method="post">
+            {% csrf_token %}
 
-        <div class="mb-3">
-            {{ form.name.label_tag }}
-            {{ form.name }}
-        </div>
-
-        <div class="mb-3">
-            {{ form.barcode.label_tag }}
-            {{ form.barcode }}
-        </div>
-
-        <!-- ✅ Alış Barkodu özel alan -->
-        <div class="mb-3">
-            {{ form.purchase_barcode.label_tag }}
-            <div class="input-group">
-                {{ form.purchase_barcode }}
-                <button type="button" id="openCamera" class="btn btn-outline-secondary">
-                    📷
-                </button>
+            <div class="form-group">
+                {{ form.name.label_tag }}
+                {{ form.name }}
             </div>
-        </div>
 
-        <div class="mb-3">
-            {{ form.purchase_price.label_tag }}
-            {{ form.purchase_price }}
-        </div>
+            <div class="form-group">
+                {{ form.barcode.label_tag }}
+                {{ form.barcode }}
+            </div>
 
-        <div class="mb-3">
-            {{ form.selling_price.label_tag }}
-            {{ form.selling_price }}
-        </div>
+            <div class="form-group">
+                {{ form.purchase_barcode.label_tag }}
+                <div class="input-group">
+                    {{ form.purchase_barcode }}
+                    <button type="button" id="openCamera" class="btn btn-outline-secondary">
+                        <i class="bi bi-camera"></i>
+                    </button>
+                </div>
+            </div>
 
-        <div class="mb-3">
-            {{ form.commution.label_tag }}
-            {{ form.commution }}
-        </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    {{ form.purchase_price.label_tag }}
+                    {{ form.purchase_price }}
+                </div>
 
-        <div class="mb-3">
-            {{ form.stock.label_tag }}
-            {{ form.stock }}
-        </div>
+                <div class="form-group" style="flex: 1; margin-left: var(--spacing-md);">
+                    {{ form.selling_price.label_tag }}
+                    {{ form.selling_price }}
+                </div>
+            </div>
 
-        <div class="mb-3">
-            {{ form.image_url.label_tag }}
-            {{ form.image_url }}
-        </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    {{ form.commution.label_tag }}
+                    {{ form.commution }}
+                </div>
 
-        <button type="submit" class="btn btn-primary">Kaydet</button>
-    </form>
-    {% if form.instance.id %}
-    <hr>
-    <form method="post" action="{% url 'delete_product' form.instance.id %}" onsubmit="return confirm('Bu ürünü silmek istediğinize emin misiniz?');">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Sil</button>
-    </form>
-    {% endif %}
+                <div class="form-group" style="flex: 1; margin-left: var(--spacing-md);">
+                    {{ form.stock.label_tag }}
+                    {{ form.stock }}
+                </div>
+            </div>
+
+            <div class="form-group">
+                {{ form.image_url.label_tag }}
+                {{ form.image_url }}
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">Kaydet</button>
+                <a href="{% url 'product_list' %}" class="btn btn-secondary">İptal</a>
+                {% if form.instance.id %}
+                <button type="button" class="btn btn-danger" onclick="deleteProduct()">Sil</button>
+                {% endif %}
+            </div>
+        </form>
+    </div>
 </div>
 
-<!-- ✅ Kamera entegrasyonu -->
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const purchaseBarcodeInput = document.getElementById('id_purchase_barcode');
@@ -76,13 +81,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Consume a stored barcode from localStorage if it was saved by the scanner
     function consumeStoredBarcode() {
         try {
             const storedPayload = localStorage.getItem('last_scanned_barcode');
-            if (!storedPayload) {
-                return;
-            }
+            if (!storedPayload) return;
             const parsed = JSON.parse(storedPayload);
             if (parsed && parsed.field === 'purchase_barcode') {
                 purchaseBarcodeInput.value = parsed.value;
@@ -98,7 +100,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const cameraUrl = "{% url 'camera_view' %}?field=purchase_barcode";
             const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
             if (isMobile) {
-                // Navigate in same tab on mobile to work around pop-up blockers
                 window.location.href = cameraUrl;
             } else {
                 window.open(cameraUrl, "_blank", "width=800,height=600");
@@ -106,18 +107,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Listen for postMessage events from the scanner window
     window.addEventListener('message', handleBarcodeMessage);
-    // Listen for localStorage events for cross-tab communication
     window.addEventListener('storage', (event) => {
         if (event.key === 'last_scanned_barcode') {
             consumeStoredBarcode();
         }
     });
-    // When returning focus, consume any stored barcode
     window.addEventListener('focus', consumeStoredBarcode);
-    // Immediately consume stored barcode on page load
     consumeStoredBarcode();
 });
+
+{% if form.instance.id %}
+function deleteProduct() {
+    if (!confirm('Bu ürünü silmek istediğinize emin misiniz?')) return;
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = "{% url 'delete_product' form.instance.id %}";
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = '{{ csrf_token }}';
+    form.appendChild(csrfInput);
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+{% endif %}
 </script>
 {% endblock %}

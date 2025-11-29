@@ -11,52 +11,51 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-icons/1.8.1/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="{% static 'css/styles.css' %}">
-
-    <!-- Custom CSS -->
-    <style>
-    </style>
 </head>
 <body>
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{% url 'product_list' %}">Inventory Manager</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
+    <nav class="navbar navbar-expand-lg">
+        <div class="container-fluid" style="max-width: 1400px; margin: 0 auto;">
+            <a class="navbar-brand" href="{% url 'product_list' %}">INVENTORY</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" 
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation"
+                    style="border: 1px solid var(--color-border);">
+                <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                {% if request.session.is_logged_in %}
-                    <form class="d-flex me-auto" method="POST" action="{% url 'logout' %}">
-                        {% csrf_token %}
-                        <button class="btn btn-outline-danger" type="submit">Çıkış Yap</button>
-                    </form>
-                {% else %}
-                    <form class="d-flex me-auto" method="POST" action="{% url 'login' %}">
-                        {% csrf_token %}
-                        <input class="form-control me-2" type="password" name="password" placeholder="Şifre" required>
-                        <button class="btn btn-outline-success" type="submit">Giriş Yap</button>
-                    </form>
-                {% endif %}
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'product_list' %}">Ürünler</a>
+                        <a class="nav-link" href="{% url 'product_list' %}">İlanlar</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" href="{% url 'add_product' %}">Ürün Ekle</a>
+                        <a class="nav-link" href="{% url 'purchase_items_list' %}">Ürünler</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'camera_view' %}">
-                            <i class="bi bi-camera"></i> Kamera
-                        </a>
+                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" 
+                           href="{% url 'add_product' %}">Ürün Ekle</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'profit_calculator' %}">Kar Hesaplayici</a>
+                        <a class="nav-link" href="{% url 'profit_calculator' %}">Kâr Hesaplama</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'profit_calculator_list' %}">Kâr Kayıtları</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" href="{% url 'trendyol_profit' %}">Trendyol Kâr</a>
+                        <a class="nav-link {% if not request.session.is_logged_in %}disabled{% endif %}" 
+                           href="{% url 'trendyol_profit' %}">Trendyol</a>
+                    </li>
+                    <li class="nav-item">
+                        {% if request.session.is_logged_in %}
+                        <form method="POST" action="{% url 'logout' %}" style="display: inline;">
+                            {% csrf_token %}
+                            <button class="nav-link" type="submit" 
+                                    style="background: none; border: none; cursor: pointer; padding: 0.5rem 1rem;">
+                                <i class="bi bi-box-arrow-right"></i> Çıkış
+                            </button>
+                        </form>
+                        {% else %}
+                        <a class="nav-link" href="{% url 'login' %}">Giriş</a>
+                        {% endif %}
                     </li>
                 </ul>
             </div>
@@ -64,14 +63,14 @@
     </nav>
 
     <!-- Content Area -->
-    <div class="container mt-4">
-        {% block content %}
-        {% endblock %}
-    </div>
+    {% block content %}
+    {% endblock %}
 
     <!-- Footer -->
-    <footer class="bg-dark text-white text-center py-3 mt-4">
-        <p>&copy; 2024 Inventory Manager | Tüm Hakları Saklıdır</p>
+    <footer>
+        <div style="max-width: 1400px; margin: 0 auto; text-align: center;">
+            <p style="margin: 0;">&copy; 2024 Inventory Manager</p>
+        </div>
     </footer>
 
     <!-- Bootstrap JS -->

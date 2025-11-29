@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Yeni Ürün Ekle{% endblock %}
+
+{% block content %}
+<div class="container-fashion">
+    <div class="page-header">
+        <h1 class="page-title">Yeni Satın Alınan Ürün</h1>
+        <a href="{% url 'purchase_items_list' %}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Geri
+        </a>
+    </div>
+
+    <div class="form-container" style="max-width: 600px; margin: 0 auto;">
+        <form id="purchaseItemForm">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="name" class="form-label">Ürün Adı *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="name" 
+                       name="name" 
+                       required
+                       placeholder="Ürün adını girin">
+            </div>
+
+            <div class="form-group">
+                <label for="purchase_barcode" class="form-label">Alış Barkodu *</label>
+                <input type="text" 
+                       class="form-control" 
+                       id="purchase_barcode" 
+                       name="purchase_barcode" 
+                       required
+                       placeholder="Barkod numarasını girin">
+            </div>
+
+            <div class="form-group">
+                <label for="purchase_price" class="form-label">Alış Fiyatı (₺) *</label>
+                <input type="number" 
+                       class="form-control" 
+                       id="purchase_price" 
+                       name="purchase_price" 
+                       step="0.01" 
+                       min="0"
+                       required
+                       placeholder="0.00">
+            </div>
+
+            <div class="form-group">
+                <label for="quantity" class="form-label">Miktar *</label>
+                <input type="number" 
+                       class="form-control" 
+                       id="quantity" 
+                       name="quantity" 
+                       min="1"
+                       value="1"
+                       required>
+            </div>
+
+            <div class="form-group">
+                <label for="image_url" class="form-label">Görsel URL</label>
+                <input type="url" 
+                       class="form-control" 
+                       id="image_url" 
+                       name="image_url" 
+                       placeholder="https://example.com/image.jpg">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <i class="bi bi-check-circle"></i> Ürünü Kaydet
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.getElementById('purchaseItemForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    
+    fetch('{% url "add_purchase_item" %}', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            window.location.href = '{% url "purchase_items_list" %}';
+        } else {
+            alert('Hata: ' + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Bir hata oluştu!');
+    });
+});
+</script>
+{% endblock %}

@@ -2,178 +2,150 @@
 {% load static %}
 
 {% block content %}
-<div class="container mt-5 text-center">
-    <h2 class="mb-4 fw-bold">📷 Barkod Tarayıcı</h2>
+<div class="container-fashion">
+    <div class="page-header">
+        <h1 class="page-title">Barkod Tarayıcı</h1>
+    </div>
 
-    <div class="alert alert-info" role="alert" id="statusMessage">
+    <div class="alert alert-info" role="alert" id="statusMessage" style="text-align: center; margin-bottom: var(--spacing-lg);">
         Kameraya erişim izni vermeniz gerekiyor.
     </div>
 
-    <div class="row justify-content-center">
-        <div class="col-12 col-md-8 col-lg-6">
-            <div id="barcode-reader" style="width: 100%; height: 60vh; border: 3px solid #ccc;
-            border-radius: 12px; overflow: hidden;">
-            </div>
+    <div style="max-width: 800px; margin: 0 auto;">
+        <div id="barcode-reader" style="width: 100%; height: 60vh; border: 2px solid var(--color-border); border-radius: 8px; overflow: hidden; background: var(--color-background);">
         </div>
     </div>
 
-    <div class="mt-4">
-        <button id="retryButton" class="btn btn-outline-secondary d-none">🔄 Yeniden Dene</button>
+    <div style="text-align: center; margin-top: var(--spacing-lg);">
+        <button id="retryButton" class="btn btn-secondary d-none" style="margin-right: var(--spacing-sm);">
+            <i class="bi bi-arrow-clockwise"></i> Yeniden Dene
+        </button>
         <button id="closeButton" class="btn btn-danger">Kapat</button>
     </div>
 </div>
-<style>
-  #barcode-reader {
-      width: 100%;
-      height: 60vh; /* ekranın %60’ını kaplar */
-      border: 3px solid #ccc;
-      border-radius: 12px;
-      overflow: hidden;
-  }
 
-  #barcode-reader video {
-      width: 100% !important;
-      height: 100% !important;
-      object-fit: cover;
-  }
+<style>
+#barcode-reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+}
 </style>
 
-<!-- QuaggaJS -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        const statusMsg = document.getElementById("statusMessage");
-        const retryBtn = document.getElementById("retryButton");
-        const closeBtn = document.getElementById("closeButton");
+document.addEventListener("DOMContentLoaded", function () {
+    const statusMsg = document.getElementById("statusMessage");
+    const retryBtn = document.getElementById("retryButton");
+    const closeBtn = document.getElementById("closeButton");
 
-        // URL parametresinden hedef field'ı al (örneğin ?field=purchase_barcode)
-        const urlParams = new URLSearchParams(window.location.search);
-        const targetField = urlParams.get("field") || "product_search";
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetField = urlParams.get("field") || "product_search";
 
-        /**
-         * Durum mesajını güncelle.  Tip parametresi, Bootstrap'in
-         * alert-* sınıflarını kullanarak mesajın stilini belirler.
-         */
-        function updateStatus(message, type = "info") {
-            statusMsg.className = `alert alert-${type}`;
-            statusMsg.textContent = message;
-        }
+    function updateStatus(message, type = "info") {
+        statusMsg.className = `alert alert-${type}`;
+        statusMsg.textContent = message;
+    }
 
-        /**
-         * Tarama sonucunu üst pencereye veya localStorage'a gönderir ve
-         * kamerayı durdurur.  Sonrasında 1.5 saniye bekleyerek pencereyi
-         * kapatır veya ana sayfaya döner.
-         */
-        function handleScanResult(code) {
-            const payload = { type: "barcode_scanned", value: code, field: targetField };
-            let delivered = false;
+    function handleScanResult(code) {
+        const payload = { type: "barcode_scanned", value: code, field: targetField };
+        let delivered = false;
 
-            if (window.opener && !window.opener.closed) {
-                try {
-                    window.opener.postMessage(payload, "*");
-                    delivered = true;
-                } catch (e) {
-                    console.error("Mesaj gönderilemedi:", e);
-                }
-            }
-
-            if (!delivered) {
-                try {
-                    localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
-                } catch (storageError) {
-                    console.error("Barkod localStorage'a yazılamadı:", storageError);
-                }
-            }
-
-            // Stop Quagga and close/navigate immediately without timeout
-            Quagga.stop();
-            if (window.opener && !window.opener.closed) {
-                window.close();
-            } else {
-                if (window.history.length > 1) {
-                    window.history.back();
-                } else {
-                    window.location.href = "{% url 'product_list' %}";
-                }
+        if (window.opener && !window.opener.closed) {
+            try {
+                window.opener.postMessage(payload, "*");
+                delivered = true;
+            } catch (e) {
+                console.error("Mesaj gönderilemedi:", e);
             }
         }
 
-        /**
-         * QuaggaJS'i başlatır.  Kamera izinleri reddedilirse kullanıcıya
-         * hata mesajı gösterir ve yeniden dene butonunu görünür hale getirir.
-         */
-        function initScanner() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
-                return;
+        if (!delivered) {
+            try {
+                localStorage.setItem("last_scanned_barcode", JSON.stringify(payload));
+            } catch (storageError) {
+                console.error("Barkod localStorage'a yazılamadı:", storageError);
             }
-
-            updateStatus("Kamera başlatılıyor...");
-
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: document.getElementById("barcode-reader"),
-                    constraints: {
-                        facingMode: "environment",
-                        width: { ideal: window.innerWidth },
-                        height: { ideal: window.innerHeight }
-                    }
-                },
-                decoder: {
-                    readers: [
-                        "ean_reader"
-                    ]
-                },
-                locate: true,
-                numOfWorkers: 2,
-                frequency: 10,
-                halfSample: false,
-                locator: {
-                    patchSize: "large",
-                    halfSample: false
-                },
-            }, function (err) {
-                if (err) {
-                    console.error("Quagga init error:", err);
-                    updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
-                    retryBtn.classList.remove("d-none");
-                    return;
-                }
-                updateStatus("Kamera aktif. Barkodu okutun...");
-                Quagga.start();
-            });
-
-            // When a barcode is detected, handle the result once and ignore subsequent detections
-            Quagga.onDetected(result => {
-                const code = result?.codeResult?.code;
-                if (code) {
-                    // Remove further detection listeners to avoid multiple triggers
-                    Quagga.offDetected();
-                    handleScanResult(code);
-                }
-            });
         }
 
-        retryBtn.addEventListener("click", () => {
-            retryBtn.classList.add("d-none");
-            initScanner();
-        });
-
-        closeBtn.addEventListener("click", () => {
-            // Gracefully stop the camera and close or navigate away
-            Quagga.stop();
-            if (window.opener && !window.opener.closed) {
-                window.close();
+        Quagga.stop();
+        if (window.opener && !window.opener.closed) {
+            window.close();
+        } else {
+            if (window.history.length > 1) {
+                window.history.back();
             } else {
                 window.location.href = "{% url 'product_list' %}";
             }
+        }
+    }
+
+    function initScanner() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            updateStatus("Kamera erişimi tarayıcınızda desteklenmiyor.", "danger");
+            return;
+        }
+
+        updateStatus("Kamera başlatılıyor...");
+
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.getElementById("barcode-reader"),
+                constraints: {
+                    facingMode: "environment",
+                    width: { ideal: window.innerWidth },
+                    height: { ideal: window.innerHeight }
+                }
+            },
+            decoder: {
+                readers: ["ean_reader"]
+            },
+            locate: true,
+            numOfWorkers: 2,
+            frequency: 10,
+            halfSample: false,
+            locator: {
+                patchSize: "large",
+                halfSample: false
+            },
+        }, function (err) {
+            if (err) {
+                console.error("Quagga init error:", err);
+                updateStatus("Kamera başlatılamadı. Lütfen izin verdiğinizden emin olun.", "danger");
+                retryBtn.classList.remove("d-none");
+                return;
+            }
+            updateStatus("Kamera aktif. Barkodu okutun...");
+            Quagga.start();
         });
 
-        // Initialize scanner on page load
+        Quagga.onDetected(result => {
+            const code = result?.codeResult?.code;
+            if (code) {
+                Quagga.offDetected();
+                handleScanResult(code);
+            }
+        });
+    }
+
+    retryBtn.addEventListener("click", () => {
+        retryBtn.classList.add("d-none");
         initScanner();
     });
+
+    closeBtn.addEventListener("click", () => {
+        Quagga.stop();
+        if (window.opener && !window.opener.closed) {
+            window.close();
+        } else {
+            window.location.href = "{% url 'product_list' %}";
+        }
+    });
+
+    initScanner();
+});
 </script>
 {% endblock %}

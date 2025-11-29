@@ -33,4 +33,10 @@ urlpatterns = [
     # Custom Push Subscription Endpoint (Debug)
     path('api/push-subscribe', views.save_push_subscription, name='save_push_subscription'),
     path('api/test-notification', views.test_notification, name='test_notification'),
+    
+    # Purchase Items URLs
+    path('purchase-items/', views.purchase_items_list, name='purchase_items_list'),
+    path('purchase-items/add/', views.add_purchase_item, name='add_purchase_item'),
+    re_path(r'^purchase-items/adjust/(?P<item_id>\d+)/(?P<amount>-?\d+)/$', views.adjust_purchase_quantity, name='adjust_purchase_quantity'),
+    path('purchase-items/delete/<int:item_id>/', views.delete_purchase_item, name='delete_purchase_item'),
 ]
