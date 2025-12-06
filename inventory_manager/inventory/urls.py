@@ -21,6 +21,7 @@ urlpatterns = [
     path('trendyol-profit/', views.trendyol_profit, name='trendyol_profit'),
     # Auxiliary endpoints
     path('get_product_image/', views.get_product_image, name='get_product_image'),
+    path('api/get-product-by-barcode', views.get_product_by_barcode, name='get_product_by_barcode'),
     path('delete_profit_calculation/<int:id>/', views.delete_profit_calculation, name='delete_profit_calculation'),
     # Authentication endpoints
     path('login/', views.login_view, name='login'),

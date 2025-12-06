@@ -25,7 +25,7 @@ are conditionally displayed.
         <div class="product-overlay">
             <div class="product-actions">
                 <button class="action-btn" 
-                        onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}'); event.stopPropagation();" 
+                        onclick="window.location.href='{% url 'profit_calculator' %}?barcode={{ product.barcode }}'; event.stopPropagation();" 
                         title="Kâr Hesapla">
                     <i class="bi bi-calculator"></i>
                 </button>
@@ -34,16 +34,6 @@ are conditionally displayed.
                    title="Düzenle">
                     <i class="bi bi-pencil"></i>
                 </a>
-                <button class="action-btn" 
-                        onclick="adjustStockAjax({{ product.id }}, 1); event.stopPropagation();" 
-                        title="Artır">
-                    <i class="bi bi-plus"></i>
-                </button>
-                <button class="action-btn" 
-                        onclick="adjustStockAjax({{ product.id }}, -1); event.stopPropagation();" 
-                        title="Azalt">
-                    <i class="bi bi-dash"></i>
-                </button>
             </div>
         </div>
         {% endif %}
@@ -60,7 +50,7 @@ are conditionally displayed.
             <span style="color: var(--color-text-light); margin-left: 0.5rem;">→ {{ product.selling_price }} ₺</span>
         </div>
         <div style="font-size: 0.875rem; color: var(--color-text-light); margin-top: 0.25rem;">
-            Komisyon: %{{ product.commution }} | Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span>
+            Komisyon: %{{ product.commution }}
         </div>
         {% else %}
         <div class="product-price">{{ product.selling_price }} ₺</div>
@@ -72,7 +62,7 @@ are conditionally displayed.
         <!-- Mobile Controls -->
         {% if request.session.is_logged_in %}
         <div class="mobile-controls">
-            <button class="mobile-control-btn" onclick="calculatePrice('{{ product.barcode }}', '{{ product.selling_price }}', '{{ product.commution }}')">
+            <button class="mobile-control-btn" onclick="window.location.href='{% url 'profit_calculator' %}?barcode={{ product.barcode }}'">
                 <i class="bi bi-calculator"></i>
             </button>
             <a href="{% url 'edit_product' product.id %}" class="mobile-control-btn">

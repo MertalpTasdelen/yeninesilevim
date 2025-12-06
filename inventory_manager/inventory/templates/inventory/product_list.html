@@ -325,14 +325,6 @@ function checkAuthButtons() {
     });
 }
 
-/**
- * Redirect to the profit calculator for a specific product. Encodes parameters
- * to ensure special characters do not break the URL.
- */
-function calculatePrice(barcode, sellingPrice, commution) {
-    const url = `{% url 'profit_calculator' %}?barcode=${encodeURIComponent(barcode)}&selling_price=${encodeURIComponent(sellingPrice)}&commution=${encodeURIComponent(commution)}`;
-    window.location.href = url;
-}
 
 /**
  * AJAX stock adjustment for product cards

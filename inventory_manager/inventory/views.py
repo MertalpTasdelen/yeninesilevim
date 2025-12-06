@@ -156,21 +156,9 @@ def scan_barcode(request):
 
 def profit_calculator(request):
     barcode = request.GET.get('barcode', '')
-    selling_price = request.GET.get('selling_price', '')
-    commution = request.GET.get('commution', '')
-    
-    product = None
-    if barcode:
-        try:
-            product = Product.objects.get(barcode=barcode)
-        except Product.DoesNotExist:
-            pass
     
     context = {
         'barcode': barcode,
-        'selling_price': selling_price,
-        'commution': commution,
-        'product': product,
     }
     return render(request, 'inventory/profit_calculator.html', context)
 
@@ -876,3 +864,40 @@ def delete_purchase_item(request, item_id):
         'success': False,
         'message': 'Geçersiz istek!'
     }, status=400)
+
+
+def get_product_by_barcode(request):
+    """API endpoint to fetch product details by barcode"""
+    barcode = request.GET.get('barcode', '')
+    
+    if not barcode:
+        return JsonResponse({
+            'success': False,
+            'message': 'Barkod belirtilmedi'
+        }, status=400)
+    
+    try:
+        product = Product.objects.get(barcode=barcode)
+        return JsonResponse({
+            'success': True,
+            'product': {
+                'id': product.id,
+                'barcode': product.barcode,
+                'name': product.name,
+                'purchase_price': str(product.purchase_price),
+                'selling_price': str(product.selling_price),
+                'commution': str(product.commution),
+                'stock': product.stock,
+            }
+        })
+    except Product.DoesNotExist:
+        return JsonResponse({
+            'success': False,
+            'message': 'Ürün bulunamadı'
+        }, status=404)
+    except Exception as e:
+        logger.error(f'Product fetch error: {e}', exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'message': f'Hata: {str(e)}'
+        }, status=500)

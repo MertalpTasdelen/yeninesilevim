@@ -36,7 +36,7 @@
             <div class="form-group">
                 <label for="purchase-cost" class="form-label">Alış / Üretim Maliyeti (₺)</label>
                 <input type="number" class="form-control" id="purchase-cost" name="purchase_cost" 
-                       placeholder="0.00" step="0.01" required>
+                       placeholder="0.00" value="{{ purchase_price }}" step="0.01" required>
             </div>
             
             <div class="form-row">
@@ -126,5 +126,36 @@ function clearForm() {
         document.getElementById(id).innerText = '0';
     });
 }
+
+// Fetch product data by barcode when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const barcode = urlParams.get('barcode');
+    
+    if (barcode) {
+        fetch(`/api/get-product-by-barcode?barcode=${encodeURIComponent(barcode)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.product) {
+                    const product = data.product;
+                    document.getElementById('selling-price').value = product.selling_price;
+                    document.getElementById('commission-rate').value = product.commution;
+                    document.getElementById('purchase-cost').value = product.purchase_price;
+                    
+                    // Set default values for other fields
+                    document.getElementById('shipping-cost').value = '0';
+                    document.getElementById('packaging-cost').value = '0';
+                    document.getElementById('other-costs').value = '0';
+                    document.getElementById('vat-rate').value = '20';
+                } else {
+                    console.error('Ürün bulunamadı:', data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Ürün bilgileri alınırken hata:', error);
+            });
+    }
+});
+
 </script>
 {% endblock %}
