@@ -1,5 +1,6 @@
 import logging
 import json
+import requests
 from datetime import timedelta
 from typing import Iterable, List, Optional
 
@@ -172,3 +173,142 @@ class LowStockNotificationService:
     def run_scheduled_check(self, target_url: Optional[str] = None) -> List[Product]:
         low_stock_products = self.fetch_low_stock_products()
         return self.notify_products(low_stock_products, target_url=target_url)
+
+
+# ===========================
+# Telegram Notification Service
+# ===========================
+
+def send_telegram_notification(message: str) -> bool:
+    """
+    Send a notification message to Telegram group/channel.
+    
+    Args:
+        message: The text message to send
+        
+    Returns:
+        True if successful, False otherwise
+    """
+    bot_token = settings.TELEGRAM_BOT_TOKEN
+    chat_id = settings.TELEGRAM_CHAT_ID
+    
+    if not bot_token or not chat_id:
+        logger.warning("Telegram bot token or chat ID not configured")
+        return False
+    
+    # Convert chat_id to string and ensure it's valid
+    try:
+        chat_id = str(chat_id).strip()
+        if not chat_id or chat_id == 'None':
+            logger.error("Invalid chat_id value")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to process chat_id: {e}")
+        return False
+    
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    
+    # Telegram has 4096 character limit
+    if len(message) > 4096:
+        message = message[:4090] + "..."
+    
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "HTML",
+        "disable_web_page_preview": True
+    }
+    
+    try:
+        response = requests.post(url, json=payload, timeout=10)
+        response.raise_for_status()
+        
+        logger.info(f"Telegram notification sent successfully to chat_id: {chat_id}")
+        return True
+        
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"Telegram HTTP error: {e}")
+        logger.error(f"Response: {e.response.text if e.response else 'No response'}")
+        return False
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send Telegram notification: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error sending Telegram: {e}")
+        return False
+
+
+def send_low_stock_telegram_alert(products: List[Product]) -> bool:
+    """
+    Send low stock alert to Telegram with product list.
+    Messages are split if they exceed Telegram's character limit.
+    
+    Args:
+        products: List of low stock products
+        
+    Returns:
+        True if at least one message sent successfully, False otherwise
+    """
+    if not products:
+        return False
+    
+    # Group products by urgency
+    critical = [p for p in products if p.stock == 0]
+    urgent = [p for p in products if 0 < p.stock <= 1]
+    warning = [p for p in products if 1 < p.stock <= 3]
+    
+    messages = []
+    current_message = f"🚨 <b>Stok Uyarısı</b> 🚨\n\n📦 <b>{len(products)} ürün</b> düşük stokta\n\n"
+    
+    def add_products_section(title, emoji, product_list):
+        nonlocal current_message, messages
+        
+        if not product_list:
+            return
+        
+        section = f"{emoji} <b>{title}</b> ({len(product_list)} ürün):\n"
+        
+        for product in product_list:
+            # Escape HTML special characters
+            name = str(product.name).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            barcode = product.barcode or 'N/A'
+            
+            line = f"└ {name}\n   Barkod: <code>{barcode}</code> | Stok: <b>{product.stock}</b>\n"
+            
+            if product.stock > 0 and hasattr(product, 'selling_price') and product.selling_price:
+                line += f"   Fiyat: {product.selling_price} ₺\n"
+            
+            line += "\n"
+            
+            # Check if adding this line would exceed limit (leave 200 char buffer)
+            if len(current_message) + len(section) + len(line) > 3900:
+                messages.append(current_message)
+                current_message = f"🚨 <b>Stok Uyarısı (devam)</b> 🚨\n\n{section}"
+            
+            if section not in current_message:
+                current_message += section
+                section = ""
+            
+            current_message += line
+    
+    # Add products by priority
+    add_products_section("TÜKENDİ", "🔴", critical)
+    add_products_section("ACİL", "⚠️", urgent)
+    add_products_section("DÜŞÜK", "📦", warning)
+    
+    # Add timestamp
+    timestamp = timezone.now().strftime('%d.%m.%Y %H:%M')
+    current_message += f"\n⏰ {timestamp}"
+    messages.append(current_message)
+    
+    # Send all messages
+    success = False
+    for i, msg in enumerate(messages, 1):
+        logger.info(f"Sending Telegram message {i}/{len(messages)} (length: {len(msg)})")
+        if send_telegram_notification(msg):
+            success = True
+        else:
+            logger.error(f"Failed to send message {i}/{len(messages)}")
+    
+    return success
+

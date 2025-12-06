@@ -33,6 +33,7 @@ urlpatterns = [
     # Custom Push Subscription Endpoint (Debug)
     path('api/push-subscribe', views.save_push_subscription, name='save_push_subscription'),
     path('api/test-notification', views.test_notification, name='test_notification'),
+    path('api/test-telegram', views.test_telegram_notification, name='test_telegram_notification'),
     
     # Purchase Items URLs
     path('purchase-items/', views.purchase_items_list, name='purchase_items_list'),

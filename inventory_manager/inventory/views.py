@@ -5,7 +5,7 @@ from django.views.decorators.http import require_http_methods
 from django.urls import reverse
 from .models import Product, ProfitCalculator, PurchaseItem
 from .forms import ProductForm
-from .notifications import LowStockNotificationService
+from .notifications import LowStockNotificationService, send_low_stock_telegram_alert, send_telegram_notification
 from .trendyol_integration import (
     fetch_all_sales,
     create_15day_periods,
@@ -587,6 +587,63 @@ def test_notification(request):
         return JsonResponse({
             'success': False,
             'error': str(e)
+        }, status=500)
+
+
+def test_telegram_notification(request):
+    """Test endpoint to manually trigger Telegram notifications."""
+    try:
+        # Check configuration
+        if not settings.TELEGRAM_BOT_TOKEN or not settings.TELEGRAM_CHAT_ID:
+            return JsonResponse({
+                'success': False,
+                'message': '❌ Telegram bot ayarları yapılmamış. .env dosyasında TELEGRAM_BOT_TOKEN ve TELEGRAM_CHAT_ID tanımlayın.'
+            })
+        
+        # Check if there are low stock products
+        low_stock_products = list(Product.objects.filter(stock__lte=3))
+        
+        if not low_stock_products:
+            # Send test message even if no low stock
+            test_message = "✅ <b>Test Bildirimi</b>\n\n"
+            test_message += "Telegram bot başarıyla çalışıyor!\n"
+            test_message += "Şu an düşük stoklu ürün bulunmuyor."
+            
+            success = send_telegram_notification(test_message)
+            
+            return JsonResponse({
+                'success': success,
+                'message': '✅ Test mesajı gönderildi (düşük stoklu ürün yok)' if success else '❌ Mesaj gönderilemedi',
+                'low_stock_count': 0
+            })
+        
+        # Send low stock alert
+        success = send_low_stock_telegram_alert(low_stock_products)
+        
+        if success:
+            product_names = [p.name[:30] for p in low_stock_products[:5]]
+            if len(low_stock_products) > 5:
+                product_names.append(f"... (+{len(low_stock_products) - 5} daha)")
+                
+            return JsonResponse({
+                'success': True,
+                'message': f'✅ Telegram bildirimi gönderildi ({len(low_stock_products)} ürün)',
+                'products': product_names,
+                'low_stock_count': len(low_stock_products)
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '❌ Telegram bildirimi gönderilemedi. Loglara bakın.',
+                'low_stock_count': len(low_stock_products)
+            })
+            
+    except Exception as e:
+        logger.error(f'Telegram test failed: {e}', exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': f'❌ Hata: {str(e)}'
         }, status=500)
 
 
