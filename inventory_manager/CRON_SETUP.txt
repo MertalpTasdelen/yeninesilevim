@@ -1,0 +1,21 @@
+# Inventory Manager - Stok Kontrol Cron Job
+# Her gün saat 09:00 ve 15:00'te stok kontrolü yap (Pazar günleri hariç)
+#
+# Kurulum:
+# 1. Bu scripti sunucuya yükle: scp check_stock_cron.sh root@188.245.97.131:/root/yeninesilevim/inventory_manager/
+# 2. Çalıştırılabilir yap: chmod +x /root/yeninesilevim/inventory_manager/check_stock_cron.sh
+# 3. Crontab'a ekle: crontab -e
+# 4. Aşağıdaki satırları ekle:
+#
+# Her gün saat 09:00'da (Pazar=0 hariç)
+0 9 * * 1-6 /root/yeninesilevim/inventory_manager/check_stock_cron.sh
+#
+# Her gün saat 15:00'te (Pazar=0 hariç)
+0 15 * * 1-6 /root/yeninesilevim/inventory_manager/check_stock_cron.sh
+#
+# Cron formatı: dakika saat gün ay haftanın_günü komut
+# Haftanın günleri: 0=Pazar, 1=Pazartesi, 2=Salı, 3=Çarşamba, 4=Perşembe, 5=Cuma, 6=Cumartesi
+#
+# Logları kontrol et:
+# tail -f /root/yeninesilevim/inventory_manager/stock_check.log
+# tail -f /root/yeninesilevim/inventory_manager/logs/app.log
