@@ -35,6 +35,11 @@ urlpatterns = [
     path('api/test-notification', views.test_notification, name='test_notification'),
     path('api/test-telegram', views.test_telegram_notification, name='test_telegram_notification'),
     
+    # Telegram Bot Webhooks
+    path('api/telegram-webhook', views.telegram_webhook, name='telegram_webhook'),
+    path('api/telegram-setup', views.telegram_setup_webhook, name='telegram_setup_webhook'),
+    path('api/telegram-info', views.telegram_webhook_info, name='telegram_webhook_info'),
+    
     # Purchase Items URLs
     path('purchase-items/', views.purchase_items_list, name='purchase_items_list'),
     path('purchase-items/add/', views.add_purchase_item, name='add_purchase_item'),

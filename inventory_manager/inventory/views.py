@@ -2,10 +2,12 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponse
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
 from .models import Product, ProfitCalculator, PurchaseItem
 from .forms import ProductForm
 from .notifications import LowStockNotificationService, send_low_stock_telegram_alert, send_telegram_notification
+from .telegram_bot import TelegramBot, setup_webhook, get_webhook_info
 from .trendyol_integration import (
     fetch_all_sales,
     create_15day_periods,
@@ -17,6 +19,7 @@ import datetime
 import logging
 import traceback
 import os
+import json
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -584,6 +587,95 @@ def test_notification(request):
             
     except Exception as e:
         logger.error(f'Test notification failed: {e}', exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@csrf_exempt
+def telegram_webhook(request):
+    """
+    Webhook endpoint for receiving Telegram updates.
+    Telegram will POST to this endpoint when users send commands.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Only POST allowed'}, status=405)
+    
+    try:
+        # Parse incoming update
+        body = request.body.decode('utf-8')
+        update = json.loads(body)
+        
+        logger.info(f"Received Telegram update: {update}")
+        
+        # Process update
+        bot = TelegramBot()
+        success = bot.process_update(update)
+        
+        if success:
+            return JsonResponse({'ok': True})
+        else:
+            return JsonResponse({'ok': False, 'error': 'Failed to process'})
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in webhook: {e}")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"Webhook error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def telegram_setup_webhook(request):
+    """
+    Setup webhook endpoint.
+    Call this once to configure Telegram to send updates to your server.
+    Example: GET https://yeninesilevim.com/api/telegram-setup
+    """
+    try:
+        # Build webhook URL
+        webhook_url = request.build_absolute_uri('/api/telegram-webhook')
+        
+        # Set webhook
+        success = setup_webhook(webhook_url)
+        
+        if success:
+            # Get webhook info to confirm
+            info = get_webhook_info()
+            return JsonResponse({
+                'success': True,
+                'message': '✅ Webhook başarıyla ayarlandı!',
+                'webhook_url': webhook_url,
+                'info': info
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': '❌ Webhook ayarlanamadı. Loglara bakın.'
+            }, status=500)
+            
+    except Exception as e:
+        logger.error(f"Webhook setup error: {e}", exc_info=True)
+        return JsonResponse({
+            'success': False,
+            'error': str(e),
+            'message': f'❌ Hata: {str(e)}'
+        }, status=500)
+
+
+def telegram_webhook_info(request):
+    """
+    Get current webhook information.
+    Example: GET https://yeninesilevim.com/api/telegram-info
+    """
+    try:
+        info = get_webhook_info()
+        return JsonResponse({
+            'success': True,
+            'info': info
+        })
+    except Exception as e:
+        logger.error(f"Webhook info error: {e}", exc_info=True)
         return JsonResponse({
             'success': False,
             'error': str(e)

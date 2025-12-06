@@ -83,16 +83,25 @@ WSGI_APPLICATION = 'inventory_manager.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'postgres',  # Veritabanı adı
-        'USER': 'postgres',  # Kullanıcı adı
-        'PASSWORD': '102030',  # Şifre
-        'HOST': 'localhost',  # PostgreSQL sunucusu
-        'PORT': '5432',  # Varsayılan PostgreSQL portu
-    }
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Password validation
