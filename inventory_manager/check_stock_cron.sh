@@ -6,7 +6,7 @@
 cd /root/yeninesilevim/inventory_manager
 
 # Virtual environment'ı aktif et
-source /root/yeninesilevim/env/bin/activate
+source /root/yeninesilevim/inventory_manager/env/bin/activate
 
 # Django management komutunu çalıştır
 python manage.py check_low_stock

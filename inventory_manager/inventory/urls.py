@@ -46,4 +46,5 @@ urlpatterns = [
     path('purchase-items/add/', views.add_purchase_item, name='add_purchase_item'),
     re_path(r'^purchase-items/adjust/(?P<item_id>\d+)/(?P<amount>-?\d+)/$', views.adjust_purchase_quantity, name='adjust_purchase_quantity'),
     path('purchase-items/delete/<int:item_id>/', views.delete_purchase_item, name='delete_purchase_item'),
+    path('purchase-items/toggle-archive/<int:item_id>/', views.toggle_archive_purchase_item, name='toggle_archive_purchase_item'),
 ]

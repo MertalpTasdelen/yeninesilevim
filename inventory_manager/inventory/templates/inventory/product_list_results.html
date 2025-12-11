@@ -6,7 +6,7 @@ are conditionally displayed.
 {% endcomment %}
 
 {% for product in page_obj %}
-<div class="product-card">
+<div class="product-card" id="product-card-{{ product.id }}">
     <!-- Product Image -->
     <div class="product-image-wrapper">
         {% if product.image_url %}

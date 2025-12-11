@@ -901,3 +901,29 @@ def get_product_by_barcode(request):
             'success': False,
             'message': f'Hata: {str(e)}'
         }, status=500)
+
+
+def toggle_archive_purchase_item(request, item_id):
+    """Toggle archive status of a purchase item"""
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(PurchaseItem, id=item_id)
+            item.is_archived = not item.is_archived
+            item.save(update_fields=['is_archived'])
+            
+            return JsonResponse({
+                'success': True,
+                'is_archived': item.is_archived,
+                'message': 'Arşivlendi' if item.is_archived else 'Arşivden çıkarıldı'
+            })
+        except Exception as e:
+            logger.error(f'Archive toggle error: {e}', exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'message': f'Hata: {str(e)}'
+            }, status=500)
+    
+    return JsonResponse({
+        'success': False,
+        'message': 'Geçersiz istek'
+    }, status=400)

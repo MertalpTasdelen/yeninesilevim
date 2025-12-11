@@ -38,7 +38,7 @@
     <!-- Products Grid -->
     <div class="products-grid">
         {% for item in page_obj %}
-        <div class="product-card" id="item-card-{{ item.id }}">
+        <div class="product-card {% if item.is_archived %}archived-product{% endif %}" id="item-card-{{ item.id }}">
             <!-- Product Image -->
             <div class="product-image-wrapper">
                 {% if item.image_url %}
@@ -65,6 +65,12 @@
                                 onclick="adjustQuantity({{ item.id }}, -1); event.stopPropagation();" 
                                 title="Azalt">
                             <i class="bi bi-dash"></i>
+                        </button>
+                        <button class="action-btn {% if item.is_archived %}archive-active{% endif %}" 
+                                onclick="toggleArchiveAjax({{ item.id }}); event.stopPropagation();" 
+                                id="archive-overlay-btn-{{ item.id }}"
+                                title="{% if item.is_archived %}Arşivden Çıkar{% else %}Arşivle{% endif %}">
+                            <i class="bi bi-{% if item.is_archived %}archive-fill{% else %}archive{% endif %}" id="archive-overlay-icon-{{ item.id }}"></i>
                         </button>
                         <button class="action-btn" 
                                 onclick="deletePurchaseItem({{ item.id }}); event.stopPropagation();"
@@ -93,6 +99,12 @@
                     </button>
                     <button class="mobile-control-btn" onclick="adjustQuantity({{ item.id }}, -1)">
                         <i class="bi bi-dash"></i>
+                    </button>
+                    <button class="mobile-control-btn {% if item.is_archived %}archive-active{% endif %}" 
+                            onclick="toggleArchiveAjax({{ item.id }})" 
+                            id="archive-btn-{{ item.id }}"
+                            title="{% if item.is_archived %}Arşivden Çıkar{% else %}Arşivle{% endif %}">
+                        <i class="bi bi-{% if item.is_archived %}archive-fill{% else %}archive{% endif %}" id="archive-icon-{{ item.id }}"></i>
                     </button>
                     <button class="mobile-control-btn" onclick="deletePurchaseItem({{ item.id }})">
                         <i class="bi bi-trash"></i>
@@ -183,6 +195,72 @@ function adjustQuantity(itemId, amount) {
     .catch(error => {
         console.error('Error:', error);
         alert('Bir hata oluştu!');
+    });
+}
+
+function toggleArchiveAjax(itemId) {
+    fetch(`/purchase-items/toggle-archive/${itemId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            const card = document.getElementById(`item-card-${itemId}`);
+            const mobileBtn = document.getElementById(`archive-btn-${itemId}`);
+            const mobileIcon = document.getElementById(`archive-icon-${itemId}`);
+            const overlayBtn = document.getElementById(`archive-overlay-btn-${itemId}`);
+            const overlayIcon = document.getElementById(`archive-overlay-icon-${itemId}`);
+            
+            if (data.is_archived) {
+                card.classList.add('archived-product');
+                // Update mobile button
+                if (mobileBtn) {
+                    mobileBtn.classList.add('archive-active');
+                    mobileBtn.title = 'Arşivden Çıkar';
+                }
+                if (mobileIcon) {
+                    mobileIcon.classList.remove('bi-archive');
+                    mobileIcon.classList.add('bi-archive-fill');
+                }
+                // Update overlay button
+                if (overlayBtn) {
+                    overlayBtn.classList.add('archive-active');
+                    overlayBtn.title = 'Arşivden Çıkar';
+                }
+                if (overlayIcon) {
+                    overlayIcon.classList.remove('bi-archive');
+                    overlayIcon.classList.add('bi-archive-fill');
+                }
+            } else {
+                card.classList.remove('archived-product');
+                // Update mobile button
+                if (mobileBtn) {
+                    mobileBtn.classList.remove('archive-active');
+                    mobileBtn.title = 'Arşivle';
+                }
+                if (mobileIcon) {
+                    mobileIcon.classList.remove('bi-archive-fill');
+                    mobileIcon.classList.add('bi-archive');
+                }
+                // Update overlay button
+                if (overlayBtn) {
+                    overlayBtn.classList.remove('archive-active');
+                    overlayBtn.title = 'Arşivle';
+                }
+                if (overlayIcon) {
+                    overlayIcon.classList.remove('bi-archive-fill');
+                    overlayIcon.classList.add('bi-archive');
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Arşiv durumu güncellenirken hata:', error);
+        alert('İşlem tamamlanamadı. Lütfen tekrar deneyin.');
     });
 }
 

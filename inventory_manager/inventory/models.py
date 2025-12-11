@@ -84,6 +84,7 @@ class PurchaseItem(models.Model):
     purchase_price = models.DecimalField("Alış Fiyatı", max_digits=10, decimal_places=2)
     quantity = models.PositiveIntegerField("Miktar", default=1)
     image_url = models.CharField("Görsel URL", max_length=1024, blank=True, null=True)
+    is_archived = models.BooleanField(default=False, db_index=True, help_text="Arşivlenmiş ürünler")
     created_at = models.DateTimeField("Oluşturulma Tarihi", auto_now_add=True)
 
     def __str__(self):

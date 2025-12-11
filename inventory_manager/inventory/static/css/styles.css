@@ -465,6 +465,21 @@ h3 { font-size: var(--font-size-lg); }
     color: white;
 }
 
+.mobile-control-btn.archive-active {
+    background: #f59e0b;
+    color: white;
+}
+
+/* ========= Archived Products ========= */
+.archived-product {
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.archived-product:hover {
+    opacity: 0.7;
+}
+
 @media (max-width: 767px) {
     .mobile-controls {
         display: flex;
