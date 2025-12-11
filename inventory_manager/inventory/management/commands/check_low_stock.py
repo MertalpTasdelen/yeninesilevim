@@ -1,6 +1,7 @@
 from django.core.management.base import BaseCommand
 
-from inventory.notifications import LowStockNotificationService, send_low_stock_telegram_alert
+from inventory.notifications import LowStockNotificationService, send_low_quantity_purchase_items_telegram_alert
+from inventory.models import PurchaseItem
 
 
 class Command(BaseCommand):
@@ -40,19 +41,24 @@ class Command(BaseCommand):
         
         # Telegram Notifications
         if not web_push_only:
-            # Fetch low stock products
-            low_stock_products = list(service.fetch_low_stock_products())
+            # Fetch low quantity purchase items (excluding archived)
+            low_quantity_items = list(
+                PurchaseItem.objects.filter(
+                    quantity__lte=3,
+                    is_archived=False
+                ).order_by('quantity', 'name')
+            )
             
-            if low_stock_products:
-                telegram_success = send_low_stock_telegram_alert(low_stock_products)
+            if low_quantity_items:
+                telegram_success = send_low_quantity_purchase_items_telegram_alert(low_quantity_items)
                 if telegram_success:
-                    product_names = ", ".join(p.name[:30] for p in low_stock_products[:5])
-                    if len(low_stock_products) > 5:
-                        product_names += f" (+{len(low_stock_products) - 5} more)"
+                    item_names = ", ".join(i.name[:30] for i in low_quantity_items[:5])
+                    if len(low_quantity_items) > 5:
+                        item_names += f" (+{len(low_quantity_items) - 5} more)"
                     self.stdout.write(
-                        self.style.SUCCESS(f"✅ Telegram notification sent for {len(low_stock_products)} products: {product_names}")
+                        self.style.SUCCESS(f"✅ Telegram notification sent for {len(low_quantity_items)} purchase items: {item_names}")
                     )
                 else:
-                    self.stdout.write(self.style.WARNING("⚠️ Failed to send Telegram notification"))
+                    self.stdout.write(self.style.WARNING("⚠️ Failed to send purchase items Telegram notification"))
             else:
-                self.stdout.write("No low stock products found for Telegram notification.")
+                self.stdout.write("No low quantity purchase items found for Telegram notification.")

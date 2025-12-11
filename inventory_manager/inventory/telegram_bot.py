@@ -5,7 +5,7 @@ Handles incoming commands from Telegram group
 import logging
 from typing import List, Dict, Any
 from django.conf import settings
-from .models import Product
+from .models import PurchaseItem
 from .notifications import send_telegram_notification
 import requests
 
@@ -45,52 +45,55 @@ class TelegramBot:
             logger.error(f"Failed to send Telegram message: {e}")
             return False
     
-    def format_products_message(self, products: List[Product], title: str, emoji: str) -> str:
-        """Format products into a nice message"""
-        if not products:
+    def format_purchase_items_message(self, items: List[PurchaseItem], title: str, emoji: str) -> str:
+        """Format purchase items into a nice message"""
+        if not items:
             return f"{emoji} <b>{title}</b>\n\n✅ Harika! Hiç ürün yok."
         
         message = f"{emoji} <b>{title}</b>\n"
-        message += f"📊 Toplam: <b>{len(products)}</b> ürün\n\n"
+        message += f"📊 Toplam: <b>{len(items)}</b> ürün\n\n"
         
-        for i, product in enumerate(products, 1):
-            # Limit to 30 products to avoid message length issues
+        for i, item in enumerate(items, 1):
+            # Limit to 30 items to avoid message length issues
             if i > 30:
-                remaining = len(products) - 30
+                remaining = len(items) - 30
                 message += f"\n... ve {remaining} ürün daha\n"
                 break
             
-            name = product.name[:40]  # Truncate long names
-            barcode = product.barcode or 'N/A'
-            stock = product.stock
+            name = item.name[:40]  # Truncate long names
+            barcode = item.purchase_barcode or 'N/A'
+            quantity = item.quantity
             
             message += f"{i}. <b>{name}</b>\n"
             message += f"   └ Barkod: <code>{barcode}</code>\n"
-            message += f"   └ Stok: <b>{stock}</b> adet\n"
+            message += f"   └ Miktar: <b>{quantity}</b> adet\n"
             
-            if product.selling_price:
-                message += f"   └ Fiyat: {product.selling_price} ₺\n"
+            if item.purchase_price:
+                message += f"   └ Alış: {item.purchase_price} ₺\n"
             
             message += "\n"
         
         return message
     
-    def handle_stok_command(self, chat_id: str, message_id: int) -> bool:
-        """Handle /stok command - show all low stock products"""
+    def handle_urunler_command(self, chat_id: str, message_id: int) -> bool:
+        """Handle /urunler command - show all low quantity purchase items (excluding archived)"""
         try:
-            products = Product.objects.filter(stock__lte=3).order_by('stock', 'name')
+            items = PurchaseItem.objects.filter(
+                quantity__lte=3,
+                is_archived=False
+            ).order_by('quantity', 'name')
             
-            if not products:
-                text = "✅ <b>Harika!</b>\n\nTüm ürünlerin stoğu yeterli! 🎉"
+            if not items:
+                text = "✅ <b>Harika!</b>\n\nTüm ürünlerin miktarı yeterli! 🎉"
                 return self.send_message(chat_id, text, message_id)
             
             # Group by urgency
-            critical = [p for p in products if p.stock == 0]
-            urgent = [p for p in products if 0 < p.stock <= 1]
-            warning = [p for p in products if 1 < p.stock <= 3]
+            critical = [p for p in items if p.quantity == 0]
+            urgent = [p for p in items if 0 < p.quantity <= 1]
+            warning = [p for p in items if 1 < p.quantity <= 3]
             
-            message = f"📦 <b>Stok Durumu</b>\n\n"
-            message += f"Toplam düşük stok: <b>{products.count()}</b> ürün\n\n"
+            message = f"🛒 <b>Ürün Miktarları</b>\n\n"
+            message += f"Toplam düşük miktar: <b>{items.count()}</b> ürün\n\n"
             
             if critical:
                 message += f"🔴 Tükendi: <b>{len(critical)}</b>\n"
@@ -100,44 +103,55 @@ class TelegramBot:
                 message += f"📦 Düşük: <b>{len(warning)}</b>\n"
             
             message += "\n💡 Detay için:\n"
-            message += "/tukenen - Tükenen ürünler\n"
-            message += "/acil - Acil sipariş gerekli (1 adet)\n"
-            message += "/dusuk - Düşük stoklu ürünler (2-3 adet)"
+            message += "/tukenen_urunler - Tükenen ürünler\n"
+            message += "/acil_urunler - Acil sipariş gerekli (1 adet)\n"
+            message += "/dusuk_urunler - Düşük miktarlı ürünler (2-3 adet)"
             
             return self.send_message(chat_id, message, message_id)
             
         except Exception as e:
-            logger.error(f"Error handling /stok command: {e}")
+            logger.error(f"Error handling /urunler command: {e}")
             return False
     
-    def handle_tukenen_command(self, chat_id: str, message_id: int) -> bool:
-        """Handle /tukenen command - show out of stock products"""
+    def handle_tukenen_urunler_command(self, chat_id: str, message_id: int) -> bool:
+        """Handle /tukenen_urunler command - show out of stock purchase items (excluding archived)"""
         try:
-            products = list(Product.objects.filter(stock=0).order_by('name'))
-            message = self.format_products_message(products, "Tükenen Ürünler", "🔴")
+            items = list(PurchaseItem.objects.filter(
+                quantity=0,
+                is_archived=False
+            ).order_by('name'))
+            message = self.format_purchase_items_message(items, "Tükenen Ürünler", "🔴")
             return self.send_message(chat_id, message, message_id)
         except Exception as e:
-            logger.error(f"Error handling /tukenen command: {e}")
+            logger.error(f"Error handling /tukenen_urunler command: {e}")
             return False
     
-    def handle_acil_command(self, chat_id: str, message_id: int) -> bool:
-        """Handle /acil command - show urgent stock (0-1 items)"""
+    def handle_acil_urunler_command(self, chat_id: str, message_id: int) -> bool:
+        """Handle /acil_urunler command - show urgent purchase items (0-1 items, excluding archived)"""
         try:
-            products = list(Product.objects.filter(stock__gt=0, stock__lte=1).order_by('stock', 'name'))
-            message = self.format_products_message(products, "Acil Sipariş Gerekli", "⚠️")
+            items = list(PurchaseItem.objects.filter(
+                quantity__gt=0,
+                quantity__lte=1,
+                is_archived=False
+            ).order_by('quantity', 'name'))
+            message = self.format_purchase_items_message(items, "Acil Sipariş Gerekli (Ürünler)", "⚠️")
             return self.send_message(chat_id, message, message_id)
         except Exception as e:
-            logger.error(f"Error handling /acil command: {e}")
+            logger.error(f"Error handling /acil_urunler command: {e}")
             return False
     
-    def handle_dusuk_command(self, chat_id: str, message_id: int) -> bool:
-        """Handle /dusuk command - show low stock (2-3 items)"""
+    def handle_dusuk_urunler_command(self, chat_id: str, message_id: int) -> bool:
+        """Handle /dusuk_urunler command - show low quantity purchase items (2-3 items, excluding archived)"""
         try:
-            products = list(Product.objects.filter(stock__gt=1, stock__lte=3).order_by('stock', 'name'))
-            message = self.format_products_message(products, "Düşük Stoklu Ürünler", "📦")
+            items = list(PurchaseItem.objects.filter(
+                quantity__gt=1,
+                quantity__lte=3,
+                is_archived=False
+            ).order_by('quantity', 'name'))
+            message = self.format_purchase_items_message(items, "Düşük Miktarlı Ürünler", "📦")
             return self.send_message(chat_id, message, message_id)
         except Exception as e:
-            logger.error(f"Error handling /dusuk command: {e}")
+            logger.error(f"Error handling /dusuk_urunler command: {e}")
             return False
     
     def handle_yardim_command(self, chat_id: str, message_id: int) -> bool:
@@ -145,17 +159,20 @@ class TelegramBot:
         message = """
 🤖 <b>Stok Yönetim Botu</b>
 
-<b>Kullanılabilir Komutlar:</b>
+<b>Ürün Miktar Komutları:</b>
+/urunler - Genel ürün özeti
+/tukenen_urunler - Tükenen ürünler (0 adet)
+/acil_urunler - Acil sipariş gerekli (1 adet)
+/dusuk_urunler - Düşük miktar (2-3 adet)
 
-/stok - Genel stok özeti
-/tukenen - Tükenen ürünler (0 adet)
-/acil - Acil sipariş gerekli (1 adet)
-/dusuk - Düşük stok (2-3 adet)
+<b>Diğer Komutlar:</b>
 /yardim - Bu yardım mesajı
 
 <b>Otomatik Bildirimler:</b>
 📅 Her gün saat 09:00 ve 15:00
 🚫 Pazar günleri kapalı
+
+ℹ️ Not: Arşivlenmiş ürünler bildirimlere dahil edilmez.
 """
         return self.send_message(chat_id, message.strip(), message_id)
     
@@ -179,10 +196,10 @@ class TelegramBot:
             
             # Handle commands
             handlers = {
-                'stok': self.handle_stok_command,
-                'tukenen': self.handle_tukenen_command,
-                'acil': self.handle_acil_command,
-                'dusuk': self.handle_dusuk_command,
+                'urunler': self.handle_urunler_command,
+                'tukenen_urunler': self.handle_tukenen_urunler_command,
+                'acil_urunler': self.handle_acil_urunler_command,
+                'dusuk_urunler': self.handle_dusuk_urunler_command,
                 'yardim': self.handle_yardim_command,
                 'start': self.handle_yardim_command,
                 'help': self.handle_yardim_command,

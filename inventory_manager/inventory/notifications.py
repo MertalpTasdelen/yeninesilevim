@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.utils import timezone
 from pywebpush import webpush, WebPushException
 
-from .models import Product, PushSubscription
+from .models import Product, PushSubscription, PurchaseItem
 
 
 logger = logging.getLogger(__name__)
@@ -238,52 +238,52 @@ def send_telegram_notification(message: str) -> bool:
         return False
 
 
-def send_low_stock_telegram_alert(products: List[Product]) -> bool:
+def send_low_quantity_purchase_items_telegram_alert(items: List[PurchaseItem]) -> bool:
     """
-    Send low stock alert to Telegram with product list.
+    Send low quantity alert for purchase items to Telegram (excluding archived).
     Messages are split if they exceed Telegram's character limit.
     
     Args:
-        products: List of low stock products
+        items: List of low quantity purchase items (should already be filtered for is_archived=False)
         
     Returns:
         True if at least one message sent successfully, False otherwise
     """
-    if not products:
+    if not items:
         return False
     
-    # Group products by urgency
-    critical = [p for p in products if p.stock == 0]
-    urgent = [p for p in products if 0 < p.stock <= 1]
-    warning = [p for p in products if 1 < p.stock <= 3]
+    # Group items by urgency
+    critical = [i for i in items if i.quantity == 0]
+    urgent = [i for i in items if 0 < i.quantity <= 1]
+    warning = [i for i in items if 1 < i.quantity <= 3]
     
     messages = []
-    current_message = f"🚨 <b>Stok Uyarısı</b> 🚨\n\n📦 <b>{len(products)} ürün</b> düşük stokta\n\n"
+    current_message = f"🛒 <b>Ürün Miktar Uyarısı</b> 🛒\n\n📦 <b>{len(items)} ürün</b> düşük miktarda\n\n"
     
-    def add_products_section(title, emoji, product_list):
+    def add_items_section(title, emoji, item_list):
         nonlocal current_message, messages
         
-        if not product_list:
+        if not item_list:
             return
         
-        section = f"{emoji} <b>{title}</b> ({len(product_list)} ürün):\n"
+        section = f"{emoji} <b>{title}</b> ({len(item_list)} ürün):\n"
         
-        for product in product_list:
+        for item in item_list:
             # Escape HTML special characters
-            name = str(product.name).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            barcode = product.barcode or 'N/A'
+            name = str(item.name).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            barcode = item.purchase_barcode or 'N/A'
             
-            line = f"└ {name}\n   Barkod: <code>{barcode}</code> | Stok: <b>{product.stock}</b>\n"
+            line = f"└ {name}\n   Barkod: <code>{barcode}</code> | Miktar: <b>{item.quantity}</b>\n"
             
-            if product.stock > 0 and hasattr(product, 'selling_price') and product.selling_price:
-                line += f"   Fiyat: {product.selling_price} ₺\n"
+            if item.quantity > 0 and hasattr(item, 'purchase_price') and item.purchase_price:
+                line += f"   Alış: {item.purchase_price} ₺\n"
             
             line += "\n"
             
             # Check if adding this line would exceed limit (leave 200 char buffer)
             if len(current_message) + len(section) + len(line) > 3900:
                 messages.append(current_message)
-                current_message = f"🚨 <b>Stok Uyarısı (devam)</b> 🚨\n\n{section}"
+                current_message = f"🛒 <b>Ürün Miktar Uyarısı (devam)</b> 🛒\n\n{section}"
             
             if section not in current_message:
                 current_message += section
@@ -291,10 +291,10 @@ def send_low_stock_telegram_alert(products: List[Product]) -> bool:
             
             current_message += line
     
-    # Add products by priority
-    add_products_section("TÜKENDİ", "🔴", critical)
-    add_products_section("ACİL", "⚠️", urgent)
-    add_products_section("DÜŞÜK", "📦", warning)
+    # Add items by priority
+    add_items_section("TÜKENDİ", "🔴", critical)
+    add_items_section("ACİL", "⚠️", urgent)
+    add_items_section("DÜŞÜK", "📦", warning)
     
     # Add timestamp
     timestamp = timezone.now().strftime('%d.%m.%Y %H:%M')
@@ -304,11 +304,11 @@ def send_low_stock_telegram_alert(products: List[Product]) -> bool:
     # Send all messages
     success = False
     for i, msg in enumerate(messages, 1):
-        logger.info(f"Sending Telegram message {i}/{len(messages)} (length: {len(msg)})")
+        logger.info(f"Sending Telegram purchase items message {i}/{len(messages)} (length: {len(msg)})")
         if send_telegram_notification(msg):
             success = True
         else:
-            logger.error(f"Failed to send message {i}/{len(messages)}")
+            logger.error(f"Failed to send purchase items message {i}/{len(messages)}")
     
     return success
 
