@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+
+{% block title %}Set Yönetimi – İlan Bileşenleri{% endblock %}
+
+{% block content %}
+<div class="container-fashion">
+    <!-- Header -->
+    <div class="page-header">
+        <h1 class="page-title">Set Yönetimi</h1>
+    </div>
+
+    <div class="row g-4">
+        <!-- ═══ SOL PANEL: İlan Seç ═══ -->
+        <div class="col-lg-5">
+            <div class="card" style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px;">
+                <div class="card-body">
+                    <h5 class="card-title mb-3" style="color: var(--color-text);">
+                        <i class="bi bi-search"></i> İlan Seç
+                    </h5>
+
+                    <!-- Arama -->
+                    <form method="GET" action="{% url 'listing_components' %}" class="mb-3">
+                        {% if selected_product %}
+                        <input type="hidden" name="product_id" value="{{ selected_product.id }}">
+                        {% endif %}
+                        <div class="input-group">
+                            <input type="text" class="form-control" name="q" 
+                                   placeholder="İlan adı veya barkod ara..." 
+                                   value="{{ product_query }}" id="productSearchInput">
+                            <button class="btn btn-primary" type="submit">
+                                <i class="bi bi-search"></i>
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- İlan Listesi -->
+                    <div class="product-select-list" style="max-height: 400px; overflow-y: auto;">
+                        {% for product in products %}
+                        <a href="{% url 'listing_components' %}?product_id={{ product.id }}&q={{ product_query }}" 
+                           class="product-select-item d-flex align-items-center p-2 mb-2 text-decoration-none 
+                                  {% if selected_product.id == product.id %}active-product{% endif %}"
+                           style="border-radius: 10px; border: 1px solid var(--color-border); 
+                                  {% if selected_product.id == product.id %}border-color: var(--color-primary); background: rgba(59,130,246,0.1);{% else %}background: var(--color-bg);{% endif %}
+                                  transition: all 0.2s;">
+                            <div style="width: 56px; height: 56px; flex-shrink: 0; border-radius: 8px; overflow: hidden; background: var(--color-card); margin-right: 12px;">
+                                {% if product.image_url %}
+                                <img src="{{ product.image_url }}" 
+                                     style="width: 100%; height: 100%; object-fit: cover;"
+                                     alt="{{ product.name }}"
+                                     onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:#888\'><i class=\'bi bi-image\'></i></div>'">
+                                {% else %}
+                                <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888">
+                                    <i class="bi bi-image"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; color: var(--color-text); font-size: 0.9rem; 
+                                            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    {{ product.name }}
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--color-text-muted);">
+                                    {{ product.barcode }}
+                                </div>
+                            </div>
+                            {% if selected_product.id == product.id %}
+                            <i class="bi bi-check-circle-fill" style="color: var(--color-primary); font-size: 1.2rem;"></i>
+                            {% endif %}
+                        </a>
+                        {% empty %}
+                        <div class="text-center py-4" style="color: var(--color-text-muted);">
+                            <i class="bi bi-inbox" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Henüz ilan bulunamadı.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══ SAĞ PANEL: Seçili İlan + Bileşenler ═══ -->
+        <div class="col-lg-7">
+            {% if selected_product %}
+            <!-- Seçili İlan Kartı -->
+            <div class="card mb-4" style="background: var(--color-card); border: 1px solid var(--color-primary); border-radius: 12px;">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div style="width: 100px; height: 100px; flex-shrink: 0; border-radius: 10px; overflow: hidden; 
+                                    background: var(--color-bg); margin-right: 16px; border: 1px solid var(--color-border);">
+                            {% if selected_product.image_url %}
+                            <img src="{{ selected_product.image_url }}" 
+                                 style="width: 100%; height: 100%; object-fit: cover;" 
+                                 alt="{{ selected_product.name }}"
+                                 onerror="this.parentElement.innerHTML='<div style=\'display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:2rem\'><i class=\'bi bi-image\'></i></div>'">
+                            {% else %}
+                            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888;font-size:2rem">
+                                <i class="bi bi-image"></i>
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <h4 style="color: var(--color-text); margin-bottom: 4px;">{{ selected_product.name }}</h4>
+                            <span class="badge bg-secondary">{{ selected_product.barcode }}</span>
+                            <span class="badge bg-info">Stok: {{ selected_product.stock }}</span>
+                            <span class="badge bg-success">{{ selected_product.selling_price }} ₺</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bileşen Ekle Formu -->
+            <div class="card mb-4" style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px;">
+                <div class="card-body">
+                    <h5 class="card-title mb-3" style="color: var(--color-text);">
+                        <i class="bi bi-plus-circle"></i> Bileşen Ekle
+                    </h5>
+
+                    <form id="addComponentForm">
+                        {% csrf_token %}
+                        <div class="row g-3 align-items-end">
+                            <!-- SKU Seç -->
+                            <div class="col-12 col-md-5">
+                                <label class="form-label" style="color: var(--color-text-muted); font-size: 0.85rem;">
+                                    SKU (Alış Ürünü)
+                                </label>
+                                {{ form.purchase_item }}
+                            </div>
+
+                            <!-- SKU Önizleme -->
+                            <div class="col-12 col-md-2" id="skuPreviewCol" style="display: none;">
+                                <div id="skuPreview" style="width: 60px; height: 60px; border-radius: 8px; overflow: hidden; 
+                                     border: 1px solid var(--color-border); background: var(--color-bg);">
+                                </div>
+                            </div>
+
+                            <!-- Adet -->
+                            <div class="col-6 col-md-2">
+                                <label class="form-label" style="color: var(--color-text-muted); font-size: 0.85rem;">
+                                    Adet
+                                </label>
+                                {{ form.qty_per_listing }}
+                            </div>
+
+                            <!-- Kaydet -->
+                            <div class="col-6 col-md-3">
+                                <button type="submit" class="btn btn-primary w-100" id="addComponentBtn">
+                                    <i class="bi bi-plus-lg"></i> Ekle
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Kaydet / Vazgeç Butonları -->
+            <div class="d-flex gap-2 mb-3" id="saveButtonsContainer" style="display: none !important;">
+                <button class="btn btn-success flex-fill" id="saveAllBtn" onclick="saveAllComponents()">
+                    <i class="bi bi-check-circle"></i> Değişiklikleri Kaydet
+                </button>
+                <button class="btn btn-outline-secondary" id="cancelBtn" onclick="cancelChanges()">
+                    <i class="bi bi-x-circle"></i> Vazgeç
+                </button>
+            </div>
+
+            <!-- Mevcut Bileşenler -->
+            <div class="card" style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px;">
+                <div class="card-body">
+                    <h5 class="card-title mb-3" style="color: var(--color-text);">
+                        <i class="bi bi-list-check"></i> Bileşenler
+                        <span class="badge bg-primary ms-2" id="componentCount">{{ components|length }}</span>
+                        <span class="badge bg-warning ms-2" id="pendingCount" style="display: none;">0 değişiklik</span>
+                    </h5>
+
+                    <div id="componentsList">
+                        {% for comp in components %}
+                        <div class="component-row d-flex align-items-center p-3 mb-2" 
+                             id="component-saved-{{ comp.id }}"
+                             data-saved="true"
+                             data-purchase-item-id="{{ comp.purchase_item.id }}"
+                             data-qty="{{ comp.qty_per_listing }}"
+                             style="border-radius: 10px; border: 1px solid var(--color-border); background: var(--color-bg);">
+                            <!-- Bileşen Fotoğrafı -->
+                            <div style="width: 50px; height: 50px; flex-shrink: 0; border-radius: 8px; overflow: hidden; 
+                                        background: var(--color-card); margin-right: 12px;">
+                                {% if comp.purchase_item.image_url %}
+                                <img src="{{ comp.purchase_item.image_url }}" 
+                                     style="width: 100%; height: 100%; object-fit: cover;"
+                                     alt="{{ comp.purchase_item.name }}">
+                                {% else %}
+                                <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888">
+                                    <i class="bi bi-box-seam"></i>
+                                </div>
+                                {% endif %}
+                            </div>
+                            <!-- Bilgi -->
+                            <div style="flex: 1; min-width: 0;">
+                                <div style="font-weight: 600; color: var(--color-text); font-size: 0.9rem;">
+                                    {{ comp.purchase_item.name }}
+                                </div>
+                                <div style="font-size: 0.78rem; color: var(--color-text-muted);">
+                                    {{ comp.purchase_item.purchase_barcode }}
+                                </div>
+                            </div>
+                            <!-- Adet -->
+                            <div class="mx-3 text-center">
+                                <span class="badge bg-success text-white" style="font-size: 0.95rem; padding: 6px 12px;">
+                                    x{{ comp.qty_per_listing }}
+                                </span>
+                            </div>
+                            <!-- Kaydedilmiş işareti -->
+                            <span class="badge bg-secondary me-2" title="Kaydedilmiş">
+                                <i class="bi bi-check-circle"></i>
+                            </span>
+                        </div>
+                        {% empty %}
+                        <div class="text-center py-4" id="emptyComponentMsg" style="color: var(--color-text-muted);">
+                            <i class="bi bi-puzzle" style="font-size: 2rem;"></i>
+                            <p class="mt-2">Henüz bileşen eklenmemiş.</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% else %}
+            <!-- Henüz İlan Seçilmemiş -->
+            <div class="card" style="background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px;">
+                <div class="card-body text-center py-5">
+                    <i class="bi bi-hand-index-thumb" style="font-size: 4rem; color: var(--color-primary); opacity: 0.5;"></i>
+                    <h4 class="mt-3" style="color: var(--color-text);">Bir ilan seçin</h4>
+                    <p style="color: var(--color-text-muted);">
+                        Sol taraftan bir ilan seçerek bileşenlerini yönetebilirsiniz.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-select-item:hover {
+        border-color: var(--color-primary) !important;
+        background: rgba(59,130,246,0.05) !important;
+        transform: translateX(4px);
+    }
+    .component-row {
+        transition: all 0.2s;
+    }
+    .component-row:hover {
+        border-color: var(--color-primary) !important;
+    }
+    @media (max-width: 991px) {
+        .product-select-list {
+            max-height: 250px !important;
+        }
+    }
+</style>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// Pending Bileşenler Sistemi (Sepet mantığı - Kaydet basılınca DB'ye gider)
+// ══════════════════════════════════════════════════════════════
+
+let pendingComponents = []; // Henüz kaydedilmemiş bileşenler
+let nextTempId = 1; // Geçici ID'ler için sayaç
+
+document.addEventListener('DOMContentLoaded', function() {
+    // ── SKU seçildiğinde önizleme göster ──
+    const skuSelect = document.getElementById('id_purchase_item');
+    const skuPreviewCol = document.getElementById('skuPreviewCol');
+    const skuPreview = document.getElementById('skuPreview');
+
+    if (skuSelect) {
+        skuSelect.addEventListener('change', function() {
+            const itemId = this.value;
+            if (!itemId) {
+                skuPreviewCol.style.display = 'none';
+                return;
+            }
+            fetch(`/api/purchase-item-detail/${itemId}/`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.image_url) {
+                        skuPreview.innerHTML = `<img src="${data.image_url}" style="width:100%;height:100%;object-fit:cover;" alt="${data.name}">`;
+                    } else {
+                        skuPreview.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888"><i class="bi bi-box-seam" style="font-size:1.3rem"></i></div>`;
+                    }
+                    skuPreviewCol.style.display = 'block';
+                })
+                .catch(() => {
+                    skuPreviewCol.style.display = 'none';
+                });
+        });
+    }
+
+    // ── Bileşen Ekle (Sadece frontend'e ekler, DB'ye kaydetmez) ──
+    const addForm = document.getElementById('addComponentForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const skuSelect = document.getElementById('id_purchase_item');
+            const qtyInput = document.querySelector('[name="qty_per_listing"]');
+            
+            const purchaseItemId = skuSelect.value;
+            const purchaseItemText = skuSelect.options[skuSelect.selectedIndex].text;
+            const qty = parseFloat(qtyInput.value) || 1;
+
+            if (!purchaseItemId) {
+                showToast('Lütfen bir SKU seçin!', 'warning');
+                return;
+            }
+
+            // Aynı SKU daha önce eklendi mi kontrol et
+            const existsInPending = pendingComponents.some(c => c.purchase_item_id == purchaseItemId);
+            const existsInSaved = document.querySelector(`[data-saved="true"][data-purchase-item-id="${purchaseItemId}"]`);
+            
+            if (existsInPending || existsInSaved) {
+                showToast('Bu SKU zaten ekli!', 'warning');
+                return;
+            }
+
+            // SKU detayını al ve listeye ekle
+            fetch(`/api/purchase-item-detail/${purchaseItemId}/`)
+                .then(r => r.json())
+                .then(data => {
+                    const component = {
+                        temp_id: nextTempId++,
+                        purchase_item_id: purchaseItemId,
+                        purchase_item_name: data.name,
+                        purchase_item_barcode: data.purchase_barcode,
+                        purchase_item_image: data.image_url || '',
+                        qty_per_listing: qty
+                    };
+
+                    pendingComponents.push(component);
+                    addComponentToUI(component);
+                    updatePendingCount();
+                    showSaveButtons();
+
+                    // Formu sıfırla
+                    addForm.reset();
+                    skuPreviewCol.style.display = 'none';
+                    showToast('Bileşen eklendi! Kaydetmeyi unutmayın.', 'info');
+                })
+                .catch(err => {
+                    showToast('SKU bilgisi alınamadı: ' + err, 'danger');
+                });
+        });
+    }
+});
+
+// ── UI'ye pending bileşen ekle ──
+function addComponentToUI(comp) {
+    const emptyMsg = document.getElementById('emptyComponentMsg');
+    if (emptyMsg) emptyMsg.remove();
+
+    const imgHtml = comp.purchase_item_image 
+        ? `<img src="${comp.purchase_item_image}" style="width:100%;height:100%;object-fit:cover;">`
+        : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#888"><i class="bi bi-box-seam"></i></div>`;
+
+    const html = `
+        <div class="component-row d-flex align-items-center p-3 mb-2" 
+             id="component-temp-${comp.temp_id}"
+             data-saved="false"
+             data-purchase-item-id="${comp.purchase_item_id}"
+             data-qty="${comp.qty_per_listing}"
+             style="border-radius:10px;border:2px dashed var(--color-warning);background:rgba(255,193,7,0.1);animation:fadeIn 0.3s ease;">
+            <div style="width:50px;height:50px;flex-shrink:0;border-radius:8px;overflow:hidden;background:var(--color-card);margin-right:12px;">
+                ${imgHtml}
+            </div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-weight:600;color:var(--color-text);font-size:0.9rem;">${comp.purchase_item_name}</div>
+                <div style="font-size:0.78rem;color:var(--color-text-muted);">${comp.purchase_item_barcode}</div>
+            </div>
+            <div class="mx-3 text-center">
+                <span class="badge bg-warning text-dark" style="font-size:0.95rem;padding:6px 12px;">x${comp.qty_per_listing}</span>
+            </div>
+            <span class="badge bg-warning me-2" title="Henüz kaydedilmedi">
+                <i class="bi bi-clock-history"></i> Bekliyor
+            </span>
+            <button class="btn btn-outline-danger btn-sm" onclick="removePendingComponent(${comp.temp_id})" title="Kaldır">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>`;
+    
+    document.getElementById('componentsList').insertAdjacentHTML('beforeend', html);
+    updateComponentCount();
+}
+
+// ── Pending bileşeni kaldır ──
+function removePendingComponent(tempId) {
+    pendingComponents = pendingComponents.filter(c => c.temp_id !== tempId);
+    const el = document.getElementById(`component-temp-${tempId}`);
+    if (el) {
+        el.style.transition = 'all 0.3s';
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        setTimeout(() => el.remove(), 300);
+    }
+    
+    updatePendingCount();
+    updateComponentCount();
+    
+    if (pendingComponents.length === 0) {
+        hideSaveButtons();
+        checkIfEmpty();
+    }
+}
+
+// ── Kaydet butonlarını göster ──
+function showSaveButtons() {
+    const container = document.getElementById('saveButtonsContainer');
+    if (container) {
+        container.style.display = 'flex !important';
+        container.style.removeProperty('display');
+    }
+}
+
+// ── Kaydet butonlarını gizle ──
+function hideSaveButtons() {
+    const container = document.getElementById('saveButtonsContainer');
+    if (container) {
+        container.style.display = 'none';
+    }
+}
+
+// ── Pending sayısını güncelle ──
+function updatePendingCount() {
+    const badge = document.getElementById('pendingCount');
+    if (badge) {
+        if (pendingComponents.length > 0) {
+            badge.textContent = `${pendingComponents.length} değişiklik`;
+            badge.style.display = 'inline-block';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+}
+
+// ── Toplam bileşen sayısını güncelle ──
+function updateComponentCount() {
+    const savedCount = document.querySelectorAll('[data-saved="true"]').length;
+    const totalCount = savedCount + pendingComponents.length;
+    document.getElementById('componentCount').textContent = totalCount;
+}
+
+// ── Boş mesajı kontrol et ──
+function checkIfEmpty() {
+    const savedCount = document.querySelectorAll('[data-saved="true"]').length;
+    const list = document.getElementById('componentsList');
+    
+    if (savedCount === 0 && pendingComponents.length === 0) {
+        list.innerHTML = `
+            <div class="text-center py-4" id="emptyComponentMsg" style="color: var(--color-text-muted);">
+                <i class="bi bi-puzzle" style="font-size: 2rem;"></i>
+                <p class="mt-2">Henüz bileşen eklenmemiş.</p>
+            </div>`;
+    }
+}
+
+// ── Tüm bileşenleri kaydet ──
+function saveAllComponents() {
+    const productId = {{ selected_product.id|default:"0" }};
+    if (!productId) {
+        showToast('İlan seçilmedi!', 'danger');
+        return;
+    }
+
+    if (pendingComponents.length === 0) {
+        showToast('Kaydedilecek değişiklik yok!', 'warning');
+        return;
+    }
+
+    const saveBtn = document.getElementById('saveAllBtn');
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Kaydediliyor...';
+
+    // Mevcut kaydedilmiş bileşenleri de al
+    const savedComponents = [];
+    document.querySelectorAll('[data-saved="true"]').forEach(el => {
+        savedComponents.push({
+            purchase_item_id: el.dataset.purchaseItemId,
+            qty_per_listing: parseFloat(el.dataset.qty)
+        });
+    });
+
+    // Tüm bileşenleri birleştir (saved + pending)
+    const allComponents = [
+        ...savedComponents,
+        ...pendingComponents.map(c => ({
+            purchase_item_id: c.purchase_item_id,
+            qty_per_listing: c.qty_per_listing
+        }))
+    ];
+
+    fetch(`/listing-components/save/${productId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ components: allComponents })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.message, 'success');
+            // Sayfayı yenile - tüm bileşenler saved olarak gelecek
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        } else {
+            showToast(data.message, 'danger');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Değişiklikleri Kaydet';
+        }
+    })
+    .catch(err => {
+        showToast('Kaydetme hatası: ' + err, 'danger');
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Değişiklikleri Kaydet';
+    });
+}
+
+// ── Değişiklikleri iptal et ──
+function cancelChanges() {
+    if (!confirm('Kaydedilmemiş değişiklikler kaybolacak. Devam edilsin mi?')) return;
+    
+    // Pending bileşenleri temizle
+    pendingComponents.forEach(comp => {
+        const el = document.getElementById(`component-temp-${comp.temp_id}`);
+        if (el) el.remove();
+    });
+    
+    pendingComponents = [];
+    updatePendingCount();
+    updateComponentCount();
+    hideSaveButtons();
+    checkIfEmpty();
+    
+    showToast('Değişiklikler iptal edildi', 'info');
+}
+
+// ── Toast bildirimi ──
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = `alert alert-${type} position-fixed`;
+    toast.style.cssText = 'top:80px;right:20px;z-index:9999;min-width:280px;animation:fadeIn 0.3s ease;box-shadow:0 4px 12px rgba(0,0,0,0.3);border-radius:10px;';
+    toast.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'info' ? 'info-circle' : 'x-circle'}"></i> ${message}`;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.transition = 'all 0.3s';
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+</script>
+
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}

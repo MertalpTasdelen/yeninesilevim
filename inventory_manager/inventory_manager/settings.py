@@ -15,6 +15,7 @@ import os
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
+# settings.py -> inventory_manager/ -> inventory_manager/ -> yeninesilevim/ -> .env
 load_dotenv(os.path.join(Path(__file__).resolve().parent.parent.parent, '.env'))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -83,25 +84,26 @@ WSGI_APPLICATION = 'inventory_manager.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+if os.getenv('DB_ENGINE'):
+    # Production: PostgreSQL
+    DATABASES = {
+        'default': {
+            'ENGINE': os.getenv('DB_ENGINE'),
+            'NAME': os.getenv('DB_NAME'),
+            'USER': os.getenv('DB_USER'),
+            'PASSWORD': os.getenv('DB_PASSWORD'),
+            'HOST': os.getenv('DB_HOST', 'localhost'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
+    }
+else:
+    # Development: SQLite
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -199,3 +201,15 @@ VAPID_ADMIN_EMAIL = os.getenv('VAPID_ADMIN_EMAIL', '')
 # Telegram Bot Settings
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID', '')
+
+# Trendyol API Credentials
+TRENDYOL_SUPPLIER_ID = os.getenv('TRENDYOL_SUPPLIER_ID', '')
+TRENDYOL_API_KEY = os.getenv('TRENDYOL_API_KEY', '')
+TRENDYOL_API_SECRET = os.getenv('TRENDYOL_API_SECRET', '')
+
+# Trendyol Webhook Authentication (Basic Authentication)
+TRENDYOL_WEBHOOK_USERNAME = os.getenv('TRENDYOL_WEBHOOK_USERNAME', 'webhook_admin_2024')
+TRENDYOL_WEBHOOK_PASSWORD = os.getenv('TRENDYOL_WEBHOOK_PASSWORD', '')
+
+# Application Login Password
+APP_LOGIN_PASSWORD = os.getenv('APP_LOGIN_PASSWORD', '')

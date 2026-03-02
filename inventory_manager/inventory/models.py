@@ -96,3 +96,78 @@ class PurchaseItem(models.Model):
         verbose_name = "Satın Alınan Ürün"
         verbose_name_plural = "Satın Alınan Ürünler"
 
+
+class ListingComponent(models.Model):
+    """Bir ilanın hangi SKU'lardan (purchase_items) oluştuğunu tutar."""
+    inventory_product = models.ForeignKey(
+        Product,
+        on_delete=models.CASCADE,
+        related_name='components',
+        verbose_name="İlan",
+    )
+    purchase_item = models.ForeignKey(
+        PurchaseItem,
+        on_delete=models.RESTRICT,
+        related_name='listing_usages',
+        verbose_name="SKU (Alış Ürünü)",
+    )
+    qty_per_listing = models.DecimalField(
+        "Bu ilanda kaç adet",
+        max_digits=10,
+        decimal_places=2,
+        default=1,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.inventory_product.name} ← {self.purchase_item.name} x{self.qty_per_listing}"
+
+    class Meta:
+        db_table = "listing_components"
+        unique_together = ('inventory_product', 'purchase_item')
+        verbose_name = "İlan Bileşeni"
+        verbose_name_plural = "İlan Bileşenleri"
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(qty_per_listing__gt=0),
+                name='qty_positive_check',
+            ),
+        ]
+
+
+class TrendyolWebhookLog(models.Model):
+    """Trendyol webhook isteklerini loglar"""
+    order_number = models.CharField("Sipariş No", max_length=100, db_index=True)
+    barcode = models.CharField("Barkod", max_length=100, db_index=True)
+    status = models.CharField("Durum", max_length=50)  # shipmentPackageStatus
+    line_item_status = models.CharField("Line Item Durumu", max_length=50, blank=True, null=True, db_index=True)  # orderLineItemStatusName
+    quantity = models.IntegerField("Adet", default=1)
+    
+    # İşlem sonucu
+    success = models.BooleanField("Başarılı", default=False)
+    error_message = models.TextField("Hata Mesajı", blank=True, null=True)
+    processed = models.BooleanField("İşlendi", default=True, db_index=True, help_text="Stok düşürme işlemi yapıldı mı?")
+    
+    # Etkilenen kayıtlar
+    affected_product_id = models.IntegerField("Ürün ID", null=True, blank=True)
+    affected_components = models.JSONField("Etkilenen Bileşenler", default=list, blank=True)
+    
+    # Raw data
+    raw_payload = models.JSONField("Ham Veri", default=dict, blank=True)
+    
+    created_at = models.DateTimeField("Oluşturulma Tarihi", auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.order_number} - {self.barcode} [{self.status}]"
+
+    class Meta:
+        db_table = "trendyol_webhook_logs"
+        ordering = ['-created_at']
+        verbose_name = "Trendyol Webhook Log"
+        verbose_name_plural = "Trendyol Webhook Logları"
+        indexes = [
+            models.Index(fields=['order_number', 'barcode']),
+            models.Index(fields=['line_item_status']),
+        ]
+

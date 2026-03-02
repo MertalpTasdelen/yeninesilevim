@@ -1,5 +1,5 @@
 from django import forms
-from .models import Product
+from .models import Product, ListingComponent, PurchaseItem
 
 class ProductForm(forms.ModelForm):
     class Meta:
@@ -24,4 +24,24 @@ class ProductForm(forms.ModelForm):
             'commution': 'Komisyon',
             'stock': 'Stok Miktarı',
             'image_url': 'Resim URL\'si',
+        }
+
+
+class ListingComponentForm(forms.ModelForm):
+    class Meta:
+        model = ListingComponent
+        fields = ['purchase_item', 'qty_per_listing']
+        widgets = {
+            'purchase_item': forms.Select(attrs={'class': 'form-select', 'id': 'id_purchase_item'}),
+            'qty_per_listing': forms.NumberInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Adet girin',
+                'min': '0.01',
+                'step': '0.01',
+                'value': '1',
+            }),
+        }
+        labels = {
+            'purchase_item': 'SKU (Alış Ürünü)',
+            'qty_per_listing': 'Bu İlanda Kaç Adet',
         }

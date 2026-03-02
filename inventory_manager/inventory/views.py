@@ -4,8 +4,8 @@ from django.core.paginator import Paginator
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 from django.urls import reverse
-from .models import Product, ProfitCalculator, PurchaseItem
-from .forms import ProductForm
+from .models import Product, ProfitCalculator, PurchaseItem, ListingComponent, TrendyolWebhookLog
+from .forms import ProductForm, ListingComponentForm
 from .notifications import LowStockNotificationService, send_telegram_notification
 from .telegram_bot import TelegramBot, setup_webhook, get_webhook_info
 from .trendyol_integration import (
@@ -302,9 +302,9 @@ def trendyol_profit(request):
             logger.info(f"{'='*70}")
             logger.info(f"Seçilen Tarih Aralığı: {start_date} - {end_date}")
             
-            seller_id = "973871"
-            api_key = "uxKAGmeBsn35z1Pkyszs"
-            api_secret = "A8eBLEct9tABS4Q5UB30"
+            seller_id = settings.TRENDYOL_SUPPLIER_ID
+            api_key = settings.TRENDYOL_API_KEY
+            api_secret = settings.TRENDYOL_API_SECRET
             store_front_code = "TRENDYOLTR"
             user_agent = f"{seller_id}-OzlemFiratTasdelen"
             
@@ -394,7 +394,7 @@ def login_view(request):
     error = None
     if request.method == 'POST':
         password = request.POST.get('password', '')
-        if password == '123456':
+        if password == settings.APP_LOGIN_PASSWORD:
             request.session['is_logged_in'] = True
             return redirect('product_list')
         else:
@@ -901,3 +901,585 @@ def toggle_archive_purchase_item(request, item_id):
         'success': False,
         'message': 'Geçersiz istek'
     }, status=400)
+
+
+# ─── Listing Components (Set Yönetimi) ────────────────────────────────
+
+def listing_components(request):
+    """İlan seçme ve bileşen yönetim ekranı"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return login_redirect
+
+    product_id = request.GET.get('product_id')
+    selected_product = None
+    components = []
+    form = ListingComponentForm()
+
+    if product_id:
+        selected_product = get_object_or_404(Product, id=product_id)
+        components = ListingComponent.objects.filter(
+            inventory_product=selected_product
+        ).select_related('purchase_item')
+
+    # İlan arama
+    product_query = request.GET.get('q', '')
+    products = Product.objects.all().order_by('name')
+    if product_query:
+        products = products.filter(
+            name__icontains=product_query
+        ) | Product.objects.filter(
+            barcode__icontains=product_query
+        )
+
+    return render(request, 'inventory/listing_components.html', {
+        'products': products,
+        'selected_product': selected_product,
+        'components': components,
+        'form': form,
+        'product_query': product_query,
+    })
+
+
+def save_listing_components(request, product_id):
+    """İlan bileşenlerini toplu olarak kaydeder (sepet mantığı)"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return JsonResponse({'success': False, 'message': 'Giriş gerekli'}, status=401)
+
+    if request.method == 'POST':
+        try:
+            product = get_object_or_404(Product, id=product_id)
+            data = json.loads(request.body)
+            components_data = data.get('components', [])
+
+            if not components_data:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Kaydedilecek bileşen yok!'
+                }, status=400)
+
+            # Mevcut bileşenleri sil (yeniden oluşturulacak)
+            ListingComponent.objects.filter(inventory_product=product).delete()
+
+            # Yeni bileşenleri toplu olarak oluştur
+            components_to_create = []
+            for comp_data in components_data:
+                purchase_item_id = comp_data.get('purchase_item_id')
+                qty = comp_data.get('qty_per_listing', 1)
+
+                if not purchase_item_id:
+                    continue
+
+                try:
+                    purchase_item = PurchaseItem.objects.get(id=purchase_item_id)
+                    components_to_create.append(
+                        ListingComponent(
+                            inventory_product=product,
+                            purchase_item=purchase_item,
+                            qty_per_listing=qty
+                        )
+                    )
+                except PurchaseItem.DoesNotExist:
+                    pass
+
+            # Toplu kaydet
+            created_count = len(components_to_create)
+            if created_count > 0:
+                ListingComponent.objects.bulk_create(components_to_create)
+
+            return JsonResponse({
+                'success': True,
+                'message': f'{created_count} bileşen başarıyla kaydedildi!',
+                'count': created_count
+            })
+
+        except json.JSONDecodeError:
+            return JsonResponse({
+                'success': False,
+                'message': 'Geçersiz JSON formatı!'
+            }, status=400)
+        except Exception as e:
+            logger.error(f'Save components error: {e}', exc_info=True)
+            return JsonResponse({
+                'success': False,
+                'message': f'Hata: {str(e)}'
+            }, status=500)
+
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek'}, status=400)
+
+def add_listing_component(request, product_id):
+    """İlana bileşen ekler"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return JsonResponse({'success': False, 'message': 'Giriş gerekli'}, status=401)
+
+    if request.method == 'POST':
+        product = get_object_or_404(Product, id=product_id)
+        form = ListingComponentForm(request.POST)
+
+        if form.is_valid():
+            component = form.save(commit=False)
+            component.inventory_product = product
+            try:
+                component.save()
+                return JsonResponse({
+                    'success': True,
+                    'message': 'Bileşen başarıyla eklendi!',
+                    'component': {
+                        'id': component.id,
+                        'purchase_item_name': component.purchase_item.name,
+                        'purchase_item_image': component.purchase_item.image_url or '',
+                        'purchase_item_barcode': component.purchase_item.purchase_barcode,
+                        'qty_per_listing': str(component.qty_per_listing),
+                    }
+                })
+            except Exception as e:
+                if 'unique' in str(e).lower():
+                    return JsonResponse({
+                        'success': False,
+                        'message': 'Bu SKU zaten bu ilana ekli!'
+                    }, status=400)
+                return JsonResponse({
+                    'success': False,
+                    'message': f'Hata: {str(e)}'
+                }, status=500)
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Form geçersiz: ' + str(form.errors)
+            }, status=400)
+
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek'}, status=400)
+
+
+def delete_listing_component(request, component_id):
+    """İlan bileşenini siler"""
+    login_redirect = _require_login(request)
+    if login_redirect:
+        return JsonResponse({'success': False, 'message': 'Giriş gerekli'}, status=401)
+
+    if request.method == 'POST':
+        component = get_object_or_404(ListingComponent, id=component_id)
+        component.delete()
+        return JsonResponse({'success': True, 'message': 'Bileşen silindi!'})
+
+    return JsonResponse({'success': False, 'message': 'Geçersiz istek'}, status=400)
+
+
+def api_product_detail(request, product_id):
+    """Ürün detayını JSON olarak döndürür (fotoğraf dahil)"""
+    product = get_object_or_404(Product, id=product_id)
+    return JsonResponse({
+        'id': product.id,
+        'name': product.name,
+        'barcode': product.barcode,
+        'image_url': product.image_url or '',
+        'stock': product.stock,
+        'selling_price': str(product.selling_price),
+    })
+
+
+def api_purchase_item_detail(request, item_id):
+    """PurchaseItem detayını JSON olarak döndürür (fotoğraf dahil)"""
+    item = get_object_or_404(PurchaseItem, id=item_id)
+    return JsonResponse({
+        'id': item.id,
+        'name': item.name,
+        'purchase_barcode': item.purchase_barcode,
+        'image_url': item.image_url or '',
+        'purchase_price': str(item.purchase_price),
+    })
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TRENDYOL WEBHOOK SİSTEMİ - Otomatik Stok Düşürme
+# ═══════════════════════════════════════════════════════════════════════════
+
+@csrf_exempt
+def trendyol_order_webhook(request):
+    """
+    Trendyol'dan gelen sipariş webhook'unu işler.
+    
+    Akış:
+    1. Authentication kontrolü (API Key veya Basic Auth)
+    2. Webhook'tan gelen JSON'u parse et
+    3. Her line item için:
+       - Barcode ile inventory_product bul
+       - Product'ın listing_components'larını al
+       - Her component için purchase_item.quantity'yi düşür
+    4. Sonucu logla
+    """
+    # HEAD isteği - Trendyol'un URL doğrulaması için (body olmadan)
+    if request.method == 'HEAD':
+        response = HttpResponse(status=200)
+        response['Content-Type'] = 'application/json'
+        return response
+    
+    # GET isteği - Test amaçlı
+    if request.method == 'GET':
+        return JsonResponse({
+            'status': 'ok',
+            'service': 'inventory-notification'
+        })
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+    # ═══ BASIC AUTHENTICATION KONTROLÜ ═══
+    import base64
+    
+    auth_header = request.headers.get('Authorization', '')
+    
+    if not auth_header.startswith('Basic '):
+        logger.error("❌ Missing or invalid Authorization header")
+        return JsonResponse({'error': 'Unauthorized - Basic Auth required'}, status=401)
+    
+    try:
+        # Base64 decode
+        encoded_credentials = auth_header.replace('Basic ', '')
+        decoded_credentials = base64.b64decode(encoded_credentials).decode('utf-8')
+        username, password = decoded_credentials.split(':', 1)
+        
+        # Credentials kontrolü
+        expected_username = settings.TRENDYOL_WEBHOOK_USERNAME
+        expected_password = settings.TRENDYOL_WEBHOOK_PASSWORD
+        
+        if username != expected_username or password != expected_password:
+            logger.error(f"❌ Invalid credentials for user: {username}")
+            return JsonResponse({'error': 'Unauthorized - Invalid credentials'}, status=401)
+        
+        logger.info(f"✅ Basic Auth successful: {username}")
+        
+    except Exception as e:
+        logger.error(f"❌ Basic Auth parsing error: {e}")
+        return JsonResponse({'error': 'Unauthorized - Invalid auth format'}, status=401)
+
+    try:
+        # Gelen veriyi parse et
+        payload = json.loads(request.body)
+        
+        order_number = payload.get('orderNumber', 'UNKNOWN')
+        status = payload.get('shipmentPackageStatus', 'UNKNOWN')
+        lines = payload.get('lines', [])
+
+        logger.info(f"📦 Trendyol Webhook: Order {order_number}, Status: {status}, Lines: {len(lines)}")
+
+        # ═══ DUPLICATE KONTROLÜ ═══
+        # Aynı sipariş numarası ile daha önce işlem yapılmış mı?
+        existing_log = TrendyolWebhookLog.objects.filter(
+            order_number=order_number,
+            processed=True
+        ).first()
+        
+        if existing_log:
+            logger.warning(f"⚠️ Duplicate webhook: Order {order_number} daha önce işlendi, stok düşürülmeyecek")
+            # ⚠️ Duplicate için Telegram bildirimi GÖNDERİLMEZ
+            return JsonResponse({
+                'success': True,
+                'message': f'Sipariş {order_number} daha önce işlendi (duplicate)',
+                'order_number': order_number,
+                'duplicate': True
+            }, status=200)
+        
+        results = []
+        processed_count = 0  # Kaç line item gerçekten işlendi
+        
+        for line in lines:
+            barcode = line.get('barcode')
+            quantity = line.get('quantity', 1)
+            product_name = line.get('productName', 'N/A')
+            line_item_status = line.get('orderLineItemStatusName', 'UNKNOWN')
+            
+            if not barcode:
+                logger.warning(f"⚠️ Barcode bulunamadı: {line}")
+                continue
+            
+            # ═══ SADECE APPROVED OLANLARI İŞLE ═══
+            should_process = line_item_status == "Approved"
+            
+            if not should_process:
+                logger.info(f"⏭️ Atlandı: {barcode} - Status: {line_item_status} (Sadece 'Approved' işlenir)")
+                # Log kaydet ama stok düşürme
+                TrendyolWebhookLog.objects.create(
+                    order_number=order_number,
+                    barcode=barcode,
+                    status=status,
+                    line_item_status=line_item_status,
+                    quantity=quantity,
+                    success=False,
+                    processed=False,
+                    error_message=f"Atlandı: orderLineItemStatusName '{line_item_status}' (Sadece 'Approved' işlenir)",
+                    raw_payload=payload
+                )
+                results.append({
+                    'success': False,
+                    'message': f"Atlandı: Status '{line_item_status}'",
+                    'barcode': barcode,
+                    'line_item_status': line_item_status,
+                    'processed': False
+                })
+                continue
+                
+            # İşlemi yap ve logla
+            result = process_trendyol_order_line(
+                order_number=order_number,
+                barcode=barcode,
+                quantity=quantity,
+                status=status,
+                line_item_status=line_item_status,
+                raw_payload=payload
+            )
+            results.append(result)
+            
+            if result.get('processed'):
+                processed_count += 1
+            
+            logger.info(f"{'✅' if result['success'] else '❌'} {barcode}: {result['message']}")
+
+        # Genel özet
+        success_count = sum(1 for r in results if r['success'])
+        total_count = len(results)
+        
+        # ═══ TELEGRAM BİLDİRİMİ ═══
+        # Sadece gerçekten stok düşen (processed=True) kayıtlar varsa bildirim gönder
+        if results and processed_count > 0:
+            try:
+                telegram_message = f"🛒 <b>Yeni Trendyol Siparişi</b>\n\n"
+                telegram_message += f"📋 Sipariş No: <code>{order_number}</code>\n"
+                telegram_message += f"📊 Durum: <b>{status}</b>\n"
+                telegram_message += f"📦 Toplam Line: <b>{total_count}</b>\n"
+                telegram_message += f"✅ Başarılı: <b>{success_count}</b>\n"
+                telegram_message += f"🔄 İşlenen (Stok Düşen): <b>{processed_count}</b>\n\n"
+                
+                # Her ürün için detay
+                for i, result in enumerate(results, 1):
+                    # Processed olup olmadığını göster
+                    processed_icon = "🔄" if result.get('processed') else "⏭️"
+                    
+                    if result.get('success'):
+                        telegram_message += f"{processed_icon} <b>{i}. {result.get('product_name', 'Ürün')}</b>\n"
+                        telegram_message += f"   └ Barkod: <code>{result.get('barcode', 'N/A')}</code>\n"
+                        telegram_message += f"   └ Adet: {result.get('order_quantity', 1)}\n"
+                        
+                        # Line item status göster
+                        if result.get('line_item_status'):
+                            telegram_message += f"   └ Line Status: {result.get('line_item_status')}\n"
+                        
+                        # Etkilenen SKU'lar varsa göster
+                        affected_items = result.get('affected_items', [])
+                        if affected_items:
+                            telegram_message += f"   └ Düşürülen SKU'lar:\n"
+                            for item in affected_items[:3]:  # İlk 3 SKU
+                                telegram_message += f"      • {item['sku_name']}: {item['old_qty']} → {item['new_qty']} (-{item['deducted']})\n"
+                            if len(affected_items) > 3:
+                                telegram_message += f"      • ... ve {len(affected_items) - 3} SKU daha\n"
+                        else:
+                            telegram_message += f"   └ ⚠️ Bileşen tanımlı değil, stok düşürülmedi\n"
+                        telegram_message += "\n"
+                    else:
+                        telegram_message += f"❌ {i}. {result.get('message', 'Bilinmeyen hata')}\n"
+                        telegram_message += f"   └ Barkod: <code>{result.get('barcode', 'N/A')}</code>\n"
+                        if result.get('line_item_status'):
+                            telegram_message += f"   └ Line Status: {result.get('line_item_status')}\n"
+                        telegram_message += "\n"
+                
+                # Mesajı gönder
+                send_telegram_notification(telegram_message)
+                logger.info("✅ Telegram bildirimi gönderildi")
+            except Exception as e:
+                logger.error(f"❌ Telegram bildirimi gönderilemedi: {e}")
+        else:
+            # Bildirim gönderilmedi çünkü:
+            # - Tüm line item'lar Approved değil VEYA
+            # - Hiç ürün işlenemedi
+            if results and processed_count == 0:
+                logger.info("ℹ️ Telegram bildirimi gönderilmedi: Hiç ürün işlenmedi (tüm line item'lar Approved değil)")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'{success_count}/{total_count} line item işlendi',
+            'order_number': order_number,
+            'results': results
+        }, status=200)
+
+    except json.JSONDecodeError:
+        logger.error("❌ Invalid JSON payload")
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    except Exception as e:
+        logger.error(f"❌ Webhook error: {e}", exc_info=True)
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+def process_trendyol_order_line(order_number, barcode, quantity, status, line_item_status, raw_payload):
+    """
+    Tek bir sipariş satırını işler - stok düşürme mantığı burada
+    
+    Args:
+        order_number: Sipariş numarası
+        barcode: Ürün barkodu
+        quantity: Sipariş adedi
+        status: shipmentPackageStatus
+        line_item_status: orderLineItemStatusName (örn: "Approved")
+        raw_payload: Webhook'tan gelen ham JSON
+    
+    Returns:
+        dict: {'success': bool, 'message': str, 'processed': bool, 'affected_items': list}
+    """
+    try:
+        # 1. Barcode ile inventory_product bul
+        try:
+            product = Product.objects.get(barcode=barcode)
+        except Product.DoesNotExist:
+            # Log kaydet
+            TrendyolWebhookLog.objects.create(
+                order_number=order_number,
+                barcode=barcode,
+                status=status,
+                line_item_status=line_item_status,
+                quantity=quantity,
+                success=False,
+                processed=False,
+                error_message=f"Barkod '{barcode}' sistemde bulunamadı",
+                raw_payload=raw_payload
+            )
+            return {
+                'success': False,
+                'message': f"Barkod '{barcode}' bulunamadı",
+                'barcode': barcode,
+                'line_item_status': line_item_status,
+                'processed': False
+            }
+
+        # 2. Product'ın listing_components'larını al
+        components = ListingComponent.objects.filter(
+            inventory_product=product
+        ).select_related('purchase_item')
+
+        if not components.exists():
+            # Bileşen yoksa uyarı ver ama hata sayma
+            TrendyolWebhookLog.objects.create(
+                order_number=order_number,
+                barcode=barcode,
+                status=status,
+                line_item_status=line_item_status,
+                quantity=quantity,
+                success=True,
+                processed=True,
+                error_message=f"'{product.name}' için bileşen tanımlı değil (listing_components boş)",
+                affected_product_id=product.id,
+                raw_payload=raw_payload
+            )
+            return {
+                'success': True,
+                'message': f"'{product.name}' için bileşen yok - stok düşürülmedi",
+                'barcode': barcode,
+                'product_id': product.id,
+                'product_name': product.name,
+                'order_quantity': quantity,
+                'line_item_status': line_item_status,
+                'processed': True
+            }
+
+        # 3. Her component için purchase_item.quantity'yi düşür
+        affected_items = []
+        
+        for component in components:
+            purchase_item = component.purchase_item
+            deduction_amount = component.qty_per_listing * quantity
+            
+            # Stok düş
+            old_quantity = purchase_item.quantity
+            purchase_item.quantity -= int(deduction_amount)
+            
+            # Negatife düşmesin
+            if purchase_item.quantity < 0:
+                purchase_item.quantity = 0
+            
+            purchase_item.save()
+            
+            affected_items.append({
+                'sku_name': purchase_item.name,
+                'sku_barcode': purchase_item.purchase_barcode,
+                'old_qty': old_quantity,
+                'new_qty': purchase_item.quantity,
+                'deducted': int(deduction_amount)
+            })
+
+        # 4. Başarılı log kaydet
+        TrendyolWebhookLog.objects.create(
+            order_number=order_number,
+            barcode=barcode,
+            status=status,
+            line_item_status=line_item_status,
+            quantity=quantity,
+            success=True,
+            processed=True,
+            affected_product_id=product.id,
+            affected_components=affected_items,
+            raw_payload=raw_payload
+        )
+
+        return {
+            'success': True,
+            'message': f"'{product.name}' için {len(affected_items)} SKU stoku düşürüldü",
+            'barcode': barcode,
+            'product_id': product.id,
+            'product_name': product.name,
+            'order_quantity': quantity,
+            'line_item_status': line_item_status,
+            'processed': True,
+            'affected_items': affected_items
+        }
+
+    except Exception as e:
+        # Hata durumunda log
+        TrendyolWebhookLog.objects.create(
+            order_number=order_number,
+            barcode=barcode,
+            status=status,
+            line_item_status=line_item_status,
+            quantity=quantity,
+            success=False,
+            processed=False,
+            error_message=str(e),
+            raw_payload=raw_payload
+        )
+        logger.error(f"Process error for {barcode}: {e}", exc_info=True)
+        return {
+            'success': False,
+            'message': f"İşlem hatası: {str(e)}",
+            'barcode': barcode,
+            'line_item_status': line_item_status,
+            'processed': False
+        }
+
+
+@csrf_exempt
+def test_trendyol_webhook(request):
+    """Webhook'u test etmek için örnek sipariş gönderir"""
+    test_payload = {
+        "orderNumber": "TEST-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+        "shipmentPackageStatus": "CREATED",
+        "lines": [
+            {
+                "barcode": "1234567890",  # Kendi test barcodunu buraya yaz
+                "quantity": 1,
+                "productName": "Test Ürün",
+                "sku": "TEST-SKU-001",
+                "orderLineItemStatusName": "Approved"  # ✅ Approved status ekle
+            }
+        ]
+    }
+    
+    # Kendi webhook endpoint'ine POST at
+    response = trendyol_order_webhook(request.__class__(
+        body=json.dumps(test_payload).encode(),
+        method='POST'
+    ))
+    
+    return JsonResponse({
+        'test_payload': test_payload,
+        'webhook_response': json.loads(response.content)
+    })
+

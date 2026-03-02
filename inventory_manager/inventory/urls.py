@@ -41,6 +41,18 @@ urlpatterns = [
     path('api/telegram-setup', views.telegram_setup_webhook, name='telegram_setup_webhook'),
     path('api/telegram-info', views.telegram_webhook_info, name='telegram_webhook_info'),
     
+    # Listing Components (Set Yönetimi)
+    path('listing-components/', views.listing_components, name='listing_components'),
+    path('listing-components/save/<int:product_id>/', views.save_listing_components, name='save_listing_components'),
+    path('listing-components/add/<int:product_id>/', views.add_listing_component, name='add_listing_component'),
+    path('listing-components/delete/<int:component_id>/', views.delete_listing_component, name='delete_listing_component'),
+    path('api/product-detail/<int:product_id>/', views.api_product_detail, name='api_product_detail'),
+    path('api/purchase-item-detail/<int:item_id>/', views.api_purchase_item_detail, name='api_purchase_item_detail'),
+
+    # Trendyol Webhook (Otomatik Stok Düşürme)
+    path('notify/inventory/', views.trendyol_order_webhook, name='trendyol_order_webhook'),
+    path('notify/inventory-test/', views.test_trendyol_webhook, name='test_trendyol_webhook'),
+
     # Purchase Items URLs
     path('purchase-items/', views.purchase_items_list, name='purchase_items_list'),
     path('purchase-items/add/', views.add_purchase_item, name='add_purchase_item'),
