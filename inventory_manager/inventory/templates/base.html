@@ -80,21 +80,8 @@
     <!-- Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Service worker kaydı -->
     <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register("/service-worker.js")
-                    .then(function (registration) {
-                        console.log('ServiceWorker registered with scope:', registration.scope);
-                    })
-                    .catch(function (error) {
-                        console.error('ServiceWorker registration failed:', error);
-                    });
-            });
-        }
-
-        // ✅ CSRF Token Helper
+        // CSRF Token Helper
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -109,139 +96,7 @@
             }
             return cookieValue;
         }
-
-        // ✅ VAPID Key Base64 -> Uint8Array Dönüşümü
-        function urlBase64ToUint8Array(base64String) {
-            const padding = '='.repeat((4 - base64String.length % 4) % 4);
-            const base64 = (base64String + padding)
-                .replace(/\-/g, '+')
-                .replace(/_/g, '/');
-            const rawData = window.atob(base64);
-            const outputArray = new Uint8Array(rawData.length);
-            for (let i = 0; i < rawData.length; ++i) {
-                outputArray[i] = rawData.charCodeAt(i);
-            }
-            return outputArray;
-        }
-
-        // ✅ Push Notification Subscription Fonksiyonu
-        window.subscribeToPush = function() {
-            console.log('🚀 subscribeToPush() çağrıldı!');
-            
-            // Notification API kontrolü
-            if (!('Notification' in window)) {
-                console.error('❌ Notification API desteklenmiyor');
-                alert('❌ Tarayıcınız bildirim desteği sunmuyor.');
-                return Promise.reject('Notification API desteklenmiyor');
-            }
-            
-            if (!('serviceWorker' in navigator)) {
-                console.error('❌ Service Worker desteklenmiyor');
-                alert('❌ Tarayıcınız bildirim desteği sunmuyor.');
-                return Promise.reject('Service Worker desteklenmiyor');
-            }
-            
-            if (!('PushManager' in window)) {
-                console.error('❌ Push API desteklenmiyor');
-                alert('❌ Tarayıcınız push bildirimleri desteklemiyor.');
-                return Promise.reject('Push API desteklenmiyor');
-            }
-
-            console.log('✅ Tüm API\'ler destekleniyor, Service Worker hazır olması bekleniyor...');
-
-            return navigator.serviceWorker.ready.then(function(registration) {
-                console.log('✅ Service Worker hazır:', registration);
-                
-                const vapidPublicKey = "{{ VAPID_PUBLIC_KEY }}";
-                console.log('VAPID Key:', vapidPublicKey ? 'Mevcut ✅' : 'YOK ❌');
-                
-                if (!vapidPublicKey) {
-                    console.error('VAPID public key bulunamadı!');
-                    alert('Sunucu yapılandırma hatası.');
-                    return Promise.reject('VAPID key yok');
-                }
-
-                console.log('Bildirim izni isteniyor...');
-
-                return Notification.requestPermission().then(function(permission) {
-                    console.log('İzin durumu:', permission);
-                    
-                    if (permission !== 'granted') {
-                        console.warn('Bildirim izni reddedildi veya verilmedi');
-                        alert('Bildirim izni reddedildi!');
-                        return Promise.reject('İzin reddedildi');
-                    }
-
-                    console.log('İzin verildi, mevcut subscription kontrol ediliyor...');
-
-                    // Önce mevcut subscription'ı kontrol et
-                    return registration.pushManager.getSubscription().then(function(existingSubscription) {
-                        if (existingSubscription) {
-                            console.log('⚠️ Eski subscription bulundu, siliniyor...', existingSubscription);
-                            // Eski subscription'ı sil
-                            return existingSubscription.unsubscribe().then(function() {
-                                console.log('✅ Eski subscription silindi, yeni subscription oluşturuluyor...');
-                                // Yeni subscription oluştur
-                                return registration.pushManager.subscribe({
-                                    userVisibleOnly: true,
-                                    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-                                });
-                            });
-                        } else {
-                            console.log('Yeni subscription oluşturuluyor...');
-                            return registration.pushManager.subscribe({
-                                userVisibleOnly: true,
-                                applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-                            });
-                        }
-                    });
-                });
-            }).then(function(subscription) {
-                console.log('📤 Subscription oluşturuldu:', subscription);
-                
-                // Subscription verisini hazırla - Django-webpush'un beklediği formatta
-                const jsonSubscription = subscription.toJSON();
-                
-                // FormData kullanarak gönder - group parametresi ile
-                const formData = new FormData();
-                formData.append('status_type', 'subscribe');
-                formData.append('endpoint', jsonSubscription.endpoint);
-                formData.append('p256dh', jsonSubscription.keys.p256dh);
-                formData.append('auth', jsonSubscription.keys.auth);
-                formData.append('group', 'low_stock');
-
-                console.log('📤 Form data hazırlandı');
-                console.log('Endpoint:', jsonSubscription.endpoint);
-                console.log('P256DH:', jsonSubscription.keys.p256dh);
-                console.log('Auth:', jsonSubscription.keys.auth);
-                console.log('Group: low_stock');
-
-                return fetch('/api/push-subscribe', {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRFToken': getCookie('csrftoken'),
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                });
-            }).then(function(response) {
-                console.log('📥 Sunucu cevabı:', response.status, response.statusText);
-                
-                if (response.ok) {
-                    alert('✅ Stok uyarıları başarıyla aktif edildi!');
-                    console.log('✅ Subscription sunucuya kaydedildi');
-                    return response.json();
-                } else {
-                    console.error('❌ Sunucu hatası:', response.status);
-                    return response.text().then(function(text) {
-                        console.error('❌ Hata detayı:', text);
-                        alert('❌ Kayıt başarısız oldu. Lütfen tekrar deneyin.');
-                        throw new Error('Subscription kaydetme başarısız: ' + response.status);
-                    });
-                }
-            }).catch(function(error) {
-                console.error('❌ Push subscription hatası:', error);
-                alert('❌ Bir hata oluştu: ' + error.message);
-            });
-        };
     </script>
+
+</body>
+</html>

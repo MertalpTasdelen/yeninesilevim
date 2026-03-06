@@ -56,27 +56,6 @@ class ProfitCalculator(models.Model):
         db_table = "profits"
 
 
-class PushSubscription(models.Model):
-    """Web Push Notification subscription storage"""
-    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)
-    endpoint = models.TextField(unique=True)
-    p256dh = models.CharField(max_length=255)
-    auth = models.CharField(max_length=255)
-    group = models.CharField(max_length=50, default='default', db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Push subscription for {self.user or 'anonymous'} - {self.group}"
-
-    class Meta:
-        db_table = "push_subscriptions"
-        indexes = [
-            models.Index(fields=['group']),
-            models.Index(fields=['endpoint']),
-        ]
-
-
 class PurchaseItem(models.Model):
     """Satın alınan ürünler için model"""
     name = models.CharField("Ürün Adı", max_length=255)

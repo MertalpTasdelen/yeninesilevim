@@ -10,7 +10,6 @@ Django tabanlı stok yönetim ve Trendyol entegrasyonlu envanter sistemi.
 - 📊 Kâr hesaplama ve raporlama
 - 🔍 Barkod okuyucu desteği
 - 🔐 Güvenli kimlik doğrulama
-- 📱 Web Push bildirimleri (VAPID)
 
 ## 📋 Gereksinimler
 
@@ -75,11 +74,6 @@ APP_LOGIN_PASSWORD=your_secure_password
 # Telegram Bot (Opsiyonel)
 TELEGRAM_BOT_TOKEN=your_bot_token
 TELEGRAM_CHAT_ID=your_chat_id
-
-# VAPID Keys (Web Push - Opsiyonel)
-VAPID_PUBLIC_KEY=your_public_key
-VAPID_PRIVATE_KEY=your_private_key
-VAPID_ADMIN_EMAIL=admin@yourdomain.com
 ```
 
 ### 5. Veritabanı Kurulumu
@@ -127,14 +121,6 @@ python -c "from django.core.management.utils import get_random_secret_key; print
    - Bot'a bir mesaj gönderin
    - `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates` adresini ziyaret edin
    - `chat.id` değerini kopyalayın
-
-### VAPID Keys (Web Push)
-
-Proje içindeki script ile oluşturabilirsiniz:
-
-```bash
-python generate_vapid_keys.py
-```
 
 ## 🔗 Trendyol Webhook Kurulumu
 
