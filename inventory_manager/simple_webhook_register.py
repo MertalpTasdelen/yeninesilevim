@@ -5,29 +5,18 @@ Trendyol Webhook Kayıt - Basit Versiyon
 
 import requests
 import base64
-import os
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # ═══════════════════════════════════════════════════════════════════
-# AYARLAR - .env dosyasından okunur
+# AYARLAR
 # ═══════════════════════════════════════════════════════════════════
 
-SUPPLIER_ID = os.getenv('TRENDYOL_SUPPLIER_ID', '')
-API_KEY = os.getenv('TRENDYOL_API_KEY', '')
-API_SECRET = os.getenv('TRENDYOL_API_SECRET', '')
+SUPPLIER_ID = "973871"
+API_KEY = "uxKAGmeBsn35z1Pkyszs"
+API_SECRET = "A8eBLEct9tABS4Q5UB30"
 
-WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://yourdomain.com/notify/inventory/')
-WEBHOOK_USERNAME = os.getenv('TRENDYOL_WEBHOOK_USERNAME', 'webhook_admin_2024')
-WEBHOOK_PASSWORD = os.getenv('TRENDYOL_WEBHOOK_PASSWORD', '')
-
-# Ayarları kontrol et
-if not all([SUPPLIER_ID, API_KEY, API_SECRET, WEBHOOK_PASSWORD]):
-    print("❌ HATA: .env dosyasında gerekli değişkenler tanımlı değil!")
-    print("Gerekli değişkenler: TRENDYOL_SUPPLIER_ID, TRENDYOL_API_KEY, TRENDYOL_API_SECRET, TRENDYOL_WEBHOOK_PASSWORD")
-    exit(1)
+WEBHOOK_URL = "https://yeninesilevim.com/notify/inventory/"
+WEBHOOK_USERNAME = "webhook_admin_2024"
+WEBHOOK_PASSWORD = "xTMsQoXEsj0KXRSKHBVToB/z31qrpTwGyK18wLLFPis="
 
 # ═══════════════════════════════════════════════════════════════════
 # WEBHOOK KAYDET

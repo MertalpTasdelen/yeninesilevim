@@ -8,114 +8,171 @@
         <h1 class="page-title">Trendyol Kâr Raporu</h1>
     </div>
     
-    <form method="get" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--spacing-md); margin-bottom: var(--spacing-xl); max-width: 800px;">
-        <div class="form-group">
-            <label for="start_date" class="form-label">Başlangıç Tarihi</label>
-            <input type="date" class="form-control" name="start_date" id="start_date" value="{{ start_date }}">
-        </div>
-        <div class="form-group">
-            <label for="end_date" class="form-label">Bitiş Tarihi</label>
-            <input type="date" class="form-control" name="end_date" id="end_date" value="{{ end_date }}">
+    <form method="get" style="display: flex; align-items: flex-end; gap: var(--spacing-md); margin-bottom: var(--spacing-xl); max-width: 400px;">
+        <div class="form-group" style="flex: 1;">
+            <label for="month" class="form-label">Ay Seç</label>
+            <input type="month" class="form-control" name="month" id="month" value="{{ selected_month }}">
         </div>
         <div class="form-group" style="align-self: end;">
-            <button type="submit" class="btn btn-primary" style="width: 100%;">Hesapla</button>
+            <button type="submit" class="btn btn-primary">Hesapla</button>
         </div>
     </form>
 
-    {% if pivot_results %}
-    <div class="table-responsive" style="background: white; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-lg);">
-        <table class="table" style="margin: 0;">
-            <thead style="background: var(--color-background); border-bottom: 2px solid var(--color-border);">
-                <tr>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Sipariş No</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">İşlem Tarihi</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Ürün Sayısı</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Satıcı Geliri</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Alış Fiyatı</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Kargo</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Net Kâr</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Durum</th>
-                    <th style="padding: var(--spacing-md); font-weight: 500;">Detaylar</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for order in pivot_results %}
-                <tr style="border-bottom: 1px solid var(--color-border);">
-                    <td style="padding: var(--spacing-md);"><strong>{{ order.orderNumber }}</strong></td>
-                    <td style="padding: var(--spacing-md);">
-                        {% if order.transactionDate %}
-                        <small>{{ order.transactionDate|date:"d.m.Y H:i" }}</small>
-                        {% else %}
-                        <small style="color: var(--color-text-light);">-</small>
-                        {% endif %}
-                    </td>
-                    <td style="padding: var(--spacing-md);">{{ order.itemCount }}</td>
-                    <td style="padding: var(--spacing-md);">{{ order.totalSellerRevenue|floatformat:2 }} ₺</td>
-                    <td style="padding: var(--spacing-md);">{{ order.totalPurchasePrice|floatformat:2 }} ₺</td>
-                    <td style="padding: var(--spacing-md);">{{ order.totalShippingFee|floatformat:2 }} ₺</td>
-                    <td style="padding: var(--spacing-md);">
-                        <strong style="color: {% if order.totalNetProfit > 0 %}#10b981{% else %}#ef4444{% endif %};">
-                            {{ order.totalNetProfit|floatformat:2 }} ₺
-                        </strong>
-                    </td>
-                    <td style="padding: var(--spacing-md);">
-                        {% if order.cargoFound %}
-                        <span class="badge bg-success">Bulundu</span>
-                        {% else %}
-                        <span class="badge bg-danger">Bulunamadı</span>
-                        {% endif %}
-                    </td>
-                    <td style="padding: var(--spacing-md);">
-                        <button class="btn btn-info btn-sm" type="button" data-bs-toggle="collapse" data-bs-target="#items-{{ order.orderNumber }}">
-                            <i class="bi bi-eye"></i> Görüntüle
-                        </button>
-                    </td>
-                </tr>
-                <tr class="collapse" id="items-{{ order.orderNumber }}">
-                    <td colspan="9" style="padding: var(--spacing-md); background: var(--color-background);">
-                        <table class="table table-sm" style="margin: 0;">
-                            <thead>
-                                <tr>
-                                    <th>Barkod</th>
-                                    <th>Satıcı Geliri (₺)</th>
-                                    <th>Alış Fiyatı (₺)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for item in order.items %}
-                                <tr>
-                                    <td>{{ item.barcode }}</td>
-                                    <td>{{ item.sellerRevenue|floatformat:2 }} ₺</td>
-                                    <td>{{ item.purchasePrice|floatformat:2 }} ₺</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-    
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--spacing-md); max-width: 800px;">
-        <div class="alert alert-info">
-            <strong>Toplam Sipariş:</strong> {{ pivot_results|length }} sipariş
-        </div>
-        
-        {% if pivot_results %}
-        <div class="alert alert-success">
-            <strong>TOPLAM NET KÂR</strong><br>
-            <span style="font-size: 1.5rem; font-weight: 600; color: #10b981;">
-                {{ total_net_profit|floatformat:2 }} ₺
-            </span>
+    {% if monthly_summary %}
+    <!-- ── AYLIK KASA ÖZETİ ─────────────────────────────────────────── -->
+    <div style="margin-bottom: var(--spacing-xl);">
+        <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: var(--spacing-md);">Aylık Kasa Özeti</h2>
+
+        {% if missing_barcodes %}
+        <div class="alert alert-warning d-flex align-items-start gap-2" style="margin-bottom: var(--spacing-md);">
+            <span>&#9888;</span>
+            <div>
+                <strong>{{ missing_barcodes|length }} barkod için maliyet bulunamadı</strong>
+                — bu ürünlerin alış fiyatı net kâr hesabına dahil edilmedi.
+                <button class="btn btn-sm btn-link p-0 ms-2" type="button"
+                        data-bs-toggle="collapse" data-bs-target="#missingBarcodesList">
+                    Listeyi göster
+                </button>
+                <div class="collapse mt-2" id="missingBarcodesList">
+                    <ul class="mb-0" style="font-size: 0.85rem;">
+                        {% for bc in missing_barcodes %}
+                        <li>{{ bc }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
         </div>
         {% endif %}
+
+        <div class="table-responsive" style="background: white; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden; margin-bottom: var(--spacing-md);">
+            <table class="table" style="margin: 0;">
+                <thead style="background: var(--color-background); border-bottom: 2px solid var(--color-border);">
+                    <tr>
+                        <th style="padding: var(--spacing-md); font-weight: 500;">Ay</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Hakediş Geliri</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Kargo Gideri</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">İşlem Ücreti</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Ürün Maliyeti</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Net Kâr</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for month in monthly_summary %}
+                    <tr style="border-bottom: 1px solid var(--color-border);">
+                        <td style="padding: var(--spacing-md); font-weight: 500;">{{ month.month_label }}</td>
+                        <td style="padding: var(--spacing-md); text-align: right;">{{ month.seller_revenue|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;">{{ month.cargo_cost|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;" title="{{ month.order_count }} sipariş × 15 ₺">{{ month.transaction_fee|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;">{{ month.purchase_cost|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right;">
+                            <strong style="color: {% if month.net_profit >= 0 %}#10b981{% else %}#ef4444{% endif %}; font-size: 1rem;">
+                                {{ month.net_profit|floatformat:2 }} ₺
+                            </strong>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-    
-    {% elif start_date and end_date %}
+    <!-- ── SİPARİŞ DETAYI ───────────────────────────────────────────── -->
+    {% if order_details %}
+    <div style="margin-bottom: var(--spacing-xl);">
+        <h2 style="font-size: 1.1rem; font-weight: 600; margin-bottom: var(--spacing-md);">
+            Sipariş Detayı — {{ order_details|length }} sipariş
+        </h2>
+        <div class="table-responsive" style="background: white; border: 1px solid var(--color-border); border-radius: 4px; overflow: hidden;">
+            <table class="table" style="margin: 0;">
+                <thead style="background: var(--color-background); border-bottom: 2px solid var(--color-border);">
+                    <tr>
+                        <th style="padding: var(--spacing-md); font-weight: 500;">Sipariş No</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500;">Tarih</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: center;">Ürün</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Satıcı Geliri</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Ürün Maliyeti</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Kargo</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">İşlem Ücreti</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: right;">Net Kâr</th>
+                        <th style="padding: var(--spacing-md); font-weight: 500; text-align: center;">Kargo Durumu</th>
+                        <th style="padding: var(--spacing-md);"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in order_details %}
+                    <tr style="border-bottom: 1px solid var(--color-border);">
+                        <td style="padding: var(--spacing-md);"><strong>{{ order.orderNumber }}</strong></td>
+                        <td style="padding: var(--spacing-md);">
+                            {% if order.transactionDate %}
+                            <small>{{ order.transactionDate|date:"d.m.Y H:i" }}</small>
+                            {% else %}<small style="color: var(--color-text-light);">—</small>{% endif %}
+                        </td>
+                        <td style="padding: var(--spacing-md); text-align: center;">{{ order.itemCount }}</td>
+                        <td style="padding: var(--spacing-md); text-align: right;">{{ order.totalSellerRevenue|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;">{{ order.totalPurchasePrice|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;">{{ order.totalShippingFee|floatformat:2 }} ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right; color: #ef4444;">15.00 ₺</td>
+                        <td style="padding: var(--spacing-md); text-align: right;">
+                            <strong style="color: {% if order.totalNetProfit >= 0 %}#10b981{% else %}#ef4444{% endif %};">
+                                {{ order.totalNetProfit|floatformat:2 }} ₺
+                            </strong>
+                        </td>
+                        <td style="padding: var(--spacing-md); text-align: center;">
+                            {% if order.cargoFound %}
+                            <span class="badge bg-success">Bulundu</span>
+                            {% else %}
+                            <span class="badge bg-danger">Bulunamadı</span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: var(--spacing-md);">
+                            <button class="btn btn-outline-secondary btn-sm" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#order-{{ order.orderNumber }}"
+                                    aria-expanded="false">
+                                ▼ Detay
+                            </button>
+                        </td>
+                    </tr>
+                    <tr class="collapse" id="order-{{ order.orderNumber }}">
+                        <td colspan="10" style="padding: var(--spacing-md); background: var(--color-background);">
+                            <table class="table table-sm" style="margin: 0;">
+                                <thead>
+                                    <tr>
+                                        <th>Barkod</th>
+                                        <th>Tür</th>
+                                        <th style="text-align: right;">Satıcı Geliri</th>
+                                        <th style="text-align: right;">Alış Fiyatı</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in order.items %}
+                                    <tr>
+                                        <td>{{ item.barcode }}</td>
+                                        <td>
+                                            {% if item.transactionType == "Return" or item.transactionType == "İade" %}
+                                            <span class="badge bg-warning text-dark">İade</span>
+                                            {% else %}
+                                            <span class="badge bg-success">Satış</span>
+                                            {% endif %}
+                                        </td>
+                                        <td style="text-align: right;">{{ item.sellerRevenue|floatformat:2 }} ₺</td>
+                                        <td style="text-align: right;">{{ item.purchasePrice|floatformat:2 }} ₺</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    {% if not monthly_summary and month_submitted %}
     <div class="alert alert-warning" role="alert">
-        Belirtilen tarih aralığında kayıt bulunamadı.
+        Belirtilen ay için kayıt bulunamadı.
     </div>
     {% endif %}
 </div>

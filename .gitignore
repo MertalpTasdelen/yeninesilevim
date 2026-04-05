@@ -35,6 +35,15 @@ db.sqlite3-journal
 /staticfiles/
 /media/
 
+# QR Codes (barkodlar ve QR kodları)
+qr_codes/
+*.png
+*.jpg
+*.jpeg
+
+# CSV Export Files
+*.csv
+
 # Django migrations (optional - bazı projeler bunları commit eder)
 # */migrations/*.py
 # !*/migrations/__init__.py
@@ -150,8 +159,6 @@ site/
 # ===========================
 # Security (Sensitive Data)
 # ===========================
-# VAPID keys ve secrets
-generate_vapid_keys.py.bak
 secrets.json
 
 # ===========================

@@ -5,6 +5,12 @@ import logging
 import datetime
 from .models import Product
 
+TURKISH_MONTHS = {
+    1: "Ocak", 2: "Şubat", 3: "Mart", 4: "Nisan",
+    5: "Mayıs", 6: "Haziran", 7: "Temmuz", 8: "Ağustos",
+    9: "Eylül", 10: "Ekim", 11: "Kasım", 12: "Aralık",
+}
+
 logger = logging.getLogger(__name__)
 
 
@@ -107,26 +113,22 @@ def fetch_cargo_invoice_items(
 
 def create_15day_periods(
     start_date: datetime.datetime,
-    end_date: datetime.datetime
+    end_date: datetime.datetime,
+    extra_days_before: int = 7,
+    extra_days_after: int = 60,
 ) -> List[tuple]:
-    periods = []
-    
-    period1_start = start_date
-    period1_end = start_date + datetime.timedelta(days=14)
-    periods.append((period1_start, period1_end))
-    logger.info(f"Periyot 1 oluşturuldu: {period1_start.date()} - {period1_end.date()}")
-    
-    period2_start = start_date + datetime.timedelta(days=15)
-    period2_end = start_date + datetime.timedelta(days=29)
-    periods.append((period2_start, period2_end))
-    logger.info(f"Periyot 2 oluşturuldu: {period2_start.date()} - {period2_end.date()}")
-    
-    period3_start = start_date + datetime.timedelta(days=30)
-    period3_end = start_date + datetime.timedelta(days=44)
-    periods.append((period3_start, period3_end))
-    logger.info(f"Periyot 3 oluşturuldu: {period3_start.date()} - {period3_end.date()}")
-    
-    logger.info(f"Toplam 3 periyot oluşturuldu")
+    """
+    Kargo faturaları satış tarihinden farklı bir tarihte kesilebilir.
+    Arama penceresi start_date'den extra_days_before gün öncesine,
+    end_date'den extra_days_after gün sonrasına genişletilir.
+    """
+    cargo_start = start_date - datetime.timedelta(days=extra_days_before)
+    cargo_end = end_date + datetime.timedelta(days=extra_days_after)
+    periods = _split_into_15day_periods(cargo_start, cargo_end)
+    logger.info(
+        f"Kargo arama penceresi: {cargo_start.date()} - {cargo_end.date()} "
+        f"({len(periods)} periyot)"
+    )
     return periods
 
 
@@ -493,3 +495,346 @@ def convert_timestamp_to_datetime(timestamp_ms: int) -> datetime.datetime:
     except Exception as e:
         logger.error(f"Timestamp dönüşümü hatası: {str(e)}")
         return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MONTHLY SUMMARY — new pipeline
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _split_into_15day_periods(
+    start_date: datetime.datetime,
+    end_date: datetime.datetime,
+) -> List[tuple]:
+    """Split any date range into max-15-day chunks required by the Trendyol API."""
+    periods = []
+    current = start_date
+    while current <= end_date:
+        chunk_end = min(current + datetime.timedelta(days=14), end_date)
+        periods.append((current, chunk_end))
+        current = chunk_end + datetime.timedelta(seconds=1)
+    return periods
+
+
+def fetch_settlements_all_pages(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    start_ts: int,
+    end_ts: int,
+    transaction_types: List[str],
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> List[Dict[str, Any]]:
+    """Fetch all pages of settlements for multiple transaction types (uses transactionTypes plural param)."""
+    url = f"{base_url}/{seller_id}/settlements"
+    headers = {
+        "User-Agent": user_agent or f"{seller_id}-SelfIntegration",
+        "storeFrontCode": store_front_code,
+        "Content-Type": "application/json",
+    }
+    auth = HTTPBasicAuth(api_key, api_secret)
+    size = 500
+    all_items: List[Dict[str, Any]] = []
+    page = 0
+
+    while True:
+        params = {
+            "startDate": start_ts,
+            "endDate": end_ts,
+            "transactionTypes": ",".join(transaction_types),
+            "page": page,
+            "size": size,
+        }
+        try:
+            response = requests.get(url, params=params, headers=headers, auth=auth, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            logger.error(f"fetch_settlements_all_pages page={page} hata: {e}")
+            break
+
+        content = data.get("content", []) or []
+        all_items.extend(content)
+        total_pages = data.get("totalPages", 1)
+        logger.info(f"  settlements page={page}/{total_pages - 1}: {len(content)} kayıt")
+
+        if page >= total_pages - 1 or not content:
+            break
+        page += 1
+
+    return all_items
+
+
+def build_cargo_cost_by_order(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    start_date: datetime.datetime,
+    end_date: datetime.datetime,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> Dict[str, float]:
+    """
+    Returns {orderNumber: total_cargo_cost} by:
+    1. Fetching DeductionInvoices across 15-day periods
+    2. Filtering records where transactionType is 'Kargo Faturası' / 'Kargo Fatura'
+    3. Fetching cargo-invoice items for each invoice serial
+
+    Kargo faturaları sipariş tarihinden 2-3 ay sonra kesilebilir;
+    bu yüzden arama penceresi start_date-7 / end_date+60 olarak genişletilir.
+    """
+    cargo_start = start_date - datetime.timedelta(days=7)
+    cargo_end = end_date + datetime.timedelta(days=60)
+    logger.info(
+        f"build_cargo_cost_by_order arama penceresi: "
+        f"{cargo_start.date()} - {cargo_end.date()}"
+    )
+    periods = _split_into_15day_periods(cargo_start, cargo_end)
+    seen_serials: set = set()
+    serials: List[str] = []
+
+    for period_start, period_end in periods:
+        start_ts = int(period_start.timestamp() * 1000)
+        end_ts = int(period_end.timestamp() * 1000)
+        deductions = fetch_deduction_invoices_for_period(
+            seller_id=seller_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            start_date=start_ts,
+            end_date=end_ts,
+            store_front_code=store_front_code,
+            user_agent=user_agent,
+            base_url=base_url,
+        )
+        for record in deductions:
+            if record.get("transactionType") in ["Kargo Faturası", "Kargo Fatura"]:
+                invoice_id = str(record.get("id", ""))
+                if invoice_id and invoice_id not in seen_serials:
+                    serials.append(invoice_id)
+                    seen_serials.add(invoice_id)
+
+    logger.info(f"build_cargo_cost_by_order: {len(serials)} adet kargo faturası seri no bulundu")
+
+    cargo_by_order: Dict[str, float] = {}
+
+    for serial in serials:
+        page = 0
+        size = 500
+        while True:
+            try:
+                resp = fetch_cargo_invoice_items(
+                    seller_id=seller_id,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    invoice_serial_number=serial,
+                    page=page,
+                    size=size,
+                    store_front_code=store_front_code,
+                    user_agent=user_agent,
+                    base_url=base_url,
+                )
+            except Exception as e:
+                logger.error(f"  kargo faturası {serial} page={page} hata: {e}")
+                break
+
+            content = resp.get("content", []) or []
+            for item in content:
+                order_num = str(item.get("orderNumber", ""))
+                amount = float(item.get("amount", 0) or 0)
+                if order_num:
+                    cargo_by_order[order_num] = round(
+                        cargo_by_order.get(order_num, 0.0) + amount, 2
+                    )
+
+            total_pages = resp.get("totalPages", 1)
+            if page >= total_pages - 1 or not content:
+                break
+            page += 1
+
+    logger.info(f"build_cargo_cost_by_order: {len(cargo_by_order)} sipariş için kargo maliyeti hesaplandı")
+    return cargo_by_order
+
+
+def calculate_monthly_summary(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    start_date: datetime.datetime,
+    end_date: datetime.datetime,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> tuple:
+    """
+    Aylık kasa özetini hesaplar.
+
+    Geri döndürür:
+      (monthly_list: List[Dict], missing_barcodes: List[str])
+
+    Her monthly_list elemanı:
+      {month_key, month_label, seller_revenue, cargo_cost, purchase_cost, net_profit}
+
+    Formül: net_profit = seller_revenue - cargo_cost - purchase_cost
+    - seller_revenue: settlements API'den dönen sellerRevenue toplamı
+      (Sale pozitif, Return negatif — API zaten işaretler)
+    - cargo_cost: cargo-invoice/items toplamı (gönderim + iade kargo)
+    - purchase_cost: yerel DB'den barcode → purchase_price toplamı
+    """
+    logger.info("calculate_monthly_summary başlıyor...")
+
+    # 1. Fetch Sale + Return settlements split into 15-day chunks
+    periods = _split_into_15day_periods(start_date, end_date)
+    all_settlements: List[Dict[str, Any]] = []
+
+    for period_start, period_end in periods:
+        start_ts = int(period_start.timestamp() * 1000)
+        end_ts = int(period_end.timestamp() * 1000)
+        chunk = fetch_settlements_all_pages(
+            seller_id=seller_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            transaction_types=["Sale", "Return"],
+            store_front_code=store_front_code,
+            user_agent=user_agent,
+            base_url=base_url,
+        )
+        all_settlements.extend(chunk)
+
+    logger.info(f"  Toplam {len(all_settlements)} settlement kaydı (Sale + Return)")
+
+    # 2. Build cargo cost per order across full date range
+    cargo_by_order = build_cargo_cost_by_order(
+        seller_id=seller_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        start_date=start_date,
+        end_date=end_date,
+        store_front_code=store_front_code,
+        user_agent=user_agent,
+        base_url=base_url,
+    )
+
+    # 3. Process settlements → monthly buckets + order-level pivot
+    monthly: Dict[str, Dict[str, Any]] = {}
+    orders: Dict[str, Dict[str, Any]] = {}
+    missing_barcodes: set = set()
+    # Track which orders' cargo cost has been attributed (to avoid double-counting multi-item orders)
+    processed_cargo_orders: Dict[str, str] = {}
+
+    for s in all_settlements:
+        barcode = s.get("barcode") or ""
+        order_number = str(s.get("orderNumber", ""))
+        seller_revenue = float(s.get("sellerRevenue") or 0)
+        transaction_date_ms = s.get("transactionDate")
+        transaction_type = s.get("transactionType", "")
+
+        if not transaction_date_ms:
+            continue
+
+        tx_dt = convert_timestamp_to_datetime(transaction_date_ms)
+        if not tx_dt:
+            continue
+
+        month_key = tx_dt.strftime("%Y-%m")
+
+        if month_key not in monthly:
+            monthly[month_key] = {
+                "month_key": month_key,
+                "month_label": f"{TURKISH_MONTHS[tx_dt.month]} {tx_dt.year}",
+                "seller_revenue": 0.0,
+                "cargo_cost": 0.0,
+                "purchase_cost": 0.0,
+                "transaction_fee": 0.0,
+                "order_count": 0,
+                "net_profit": 0.0,
+            }
+
+        # sellerRevenue: positive for Sale, negative for Return (API signs it correctly)
+        monthly[month_key]["seller_revenue"] += seller_revenue
+
+        # Purchase cost from local DB
+        purchase_price = 0.0
+        if barcode:
+            try:
+                product = Product.objects.get(barcode=barcode)
+                purchase_price = float(product.purchase_price or 0)
+                if transaction_type in ["Return", "İade"]:
+                    monthly[month_key]["purchase_cost"] -= purchase_price
+                else:
+                    monthly[month_key]["purchase_cost"] += purchase_price
+            except Product.DoesNotExist:
+                missing_barcodes.add(barcode)
+
+        # Cargo cost + transaction fee — attribute once per order on first encounter
+        if order_number and order_number not in processed_cargo_orders:
+            cargo_amount = cargo_by_order.get(order_number, 0.0)
+            monthly[month_key]["cargo_cost"] += cargo_amount
+            monthly[month_key]["transaction_fee"] += 15.0
+            monthly[month_key]["order_count"] += 1
+            processed_cargo_orders[order_number] = month_key
+
+        # Order-level pivot — built alongside monthly buckets
+        if order_number:
+            if order_number not in orders:
+                orders[order_number] = {
+                    "orderNumber": order_number,
+                    "transactionDate": tx_dt,
+                    "items": [],
+                    "totalSellerRevenue": 0.0,
+                    "totalPurchasePrice": 0.0,
+                }
+            orders[order_number]["items"].append({
+                "barcode": barcode,
+                "sellerRevenue": round(seller_revenue, 2),
+                "purchasePrice": round(purchase_price, 2),
+                "transactionType": transaction_type,
+            })
+            orders[order_number]["totalSellerRevenue"] += seller_revenue
+            if transaction_type in ["Return", "İade"]:
+                orders[order_number]["totalPurchasePrice"] -= purchase_price
+            else:
+                orders[order_number]["totalPurchasePrice"] += purchase_price
+
+    # 4. Finalize order-level pivot
+    for order_number, data in orders.items():
+        cargo = cargo_by_order.get(order_number, 0.0)
+        data["totalShippingFee"] = round(cargo, 2)
+        data["cargoFound"] = cargo > 0
+        data["itemCount"] = len(data["items"])
+        data["totalNetProfit"] = round(
+            data["totalSellerRevenue"] - data["totalPurchasePrice"] - cargo - 15.0, 2
+        )
+        data["totalSellerRevenue"] = round(data["totalSellerRevenue"], 2)
+        data["totalPurchasePrice"] = round(data["totalPurchasePrice"], 2)
+
+    order_list = sorted(
+        orders.values(),
+        key=lambda x: x.get("transactionDate") or datetime.datetime.min.replace(tzinfo=datetime.timezone.utc),
+        reverse=True,
+    )
+
+    # 5. Calculate net profit and round monthly values
+    for data in monthly.values():
+        data["net_profit"] = round(
+            data["seller_revenue"] - data["cargo_cost"] - data["purchase_cost"] - data["transaction_fee"], 2
+        )
+        data["seller_revenue"] = round(data["seller_revenue"], 2)
+        data["cargo_cost"] = round(data["cargo_cost"], 2)
+        data["purchase_cost"] = round(data["purchase_cost"], 2)
+        data["transaction_fee"] = round(data["transaction_fee"], 2)
+
+    monthly_list = sorted(monthly.values(), key=lambda x: x["month_key"])
+    missing_list = sorted(missing_barcodes)
+
+    logger.info(
+        f"calculate_monthly_summary tamamlandı: {len(monthly_list)} ay, "
+        f"{len(order_list)} sipariş, {len(missing_list)} eksik barkod"
+    )
+    return monthly_list, missing_list, order_list
