@@ -688,10 +688,17 @@ def trendyol_order_webhook(request):
     try:
         # Gelen veriyi parse et
         payload = json.loads(request.body)
-        
-        order_number = payload.get('orderNumber', 'UNKNOWN')
-        status = payload.get('shipmentPackageStatus', 'UNKNOWN')
-        lines = payload.get('lines', [])
+
+        # Trendyol gerçek webhook: {"content": [{...}]} formatında gelir
+        content = payload.get('content', None)
+        if content and isinstance(content, list) and len(content) > 0:
+            order_data = content[0]
+        else:
+            order_data = payload  # curl test / düz format fallback
+
+        order_number = order_data.get('orderNumber', 'UNKNOWN')
+        status = order_data.get('shipmentPackageStatus', 'UNKNOWN')
+        lines = order_data.get('lines', [])
 
         logger.info(f"📦 Trendyol Webhook: Order {order_number}, Status: {status}, Lines: {len(lines)}")
 
@@ -711,6 +718,18 @@ def trendyol_order_webhook(request):
                 'order_number': order_number,
                 'duplicate': True
             }, status=200)
+
+        # ═══ ÜST-LEVEL LOG — her gelen webhook kaydedilsin ═══
+        TrendyolWebhookLog.objects.create(
+            order_number=order_number,
+            barcode='',
+            status=status,
+            line_item_status='webhook_received',
+            quantity=len(lines),
+            success=False,
+            processed=False,
+            raw_payload=payload
+        )
 
         results = []
         processed_count = 0  # Kaç line item gerçekten işlendi
@@ -967,10 +986,28 @@ def process_trendyol_order_line(order_number, barcode, quantity, status, line_it
 
 @csrf_exempt
 def test_trendyol_webhook(request):
-    if request.method == 'POST':
-        return trendyol_order_webhook(request)
-    # GET isteğinde basit durum bilgisi döndür
-    return JsonResponse({'status': 'webhook endpoint active'})
-
-
-
+    """Webhook'u test etmek için örnek sipariş gönderir"""
+    test_payload = {
+        "orderNumber": "TEST-" + datetime.datetime.now().strftime("%Y%m%d%H%M%S"),
+        "shipmentPackageStatus": "CREATED",
+        "lines": [
+            {
+                "barcode": "1234567890",  # Kendi test barcodunu buraya yaz
+                "quantity": 1,
+                "productName": "Test Ürün",
+                "sku": "TEST-SKU-001",
+                "orderLineItemStatusName": "Approved"  # ✅ Approved status ekle
+            }
+        ]
+    }
+    
+    # Kendi webhook endpoint'ine POST at
+    response = trendyol_order_webhook(request.__class__(
+        body=json.dumps(test_payload).encode(),
+        method='POST'
+    ))
+    
+    return JsonResponse({
+        'test_payload': test_payload,
+        'webhook_response': json.loads(response.content)
+    })
