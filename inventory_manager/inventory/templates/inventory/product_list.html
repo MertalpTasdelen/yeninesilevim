@@ -5,6 +5,9 @@
     <!-- Header -->
     <div class="page-header">
         <h1 class="page-title">İlanlar</h1>
+        {% if request.session.is_logged_in %}
+        <a href="{% url 'add_product' %}" class="btn btn-primary">+ Yeni İlan Ekle</a>
+        {% endif %}
     </div>
 
     <!-- Search & Filter -->

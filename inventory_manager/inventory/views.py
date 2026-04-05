@@ -449,6 +449,34 @@ def toggle_archive_purchase_item(request, item_id):
     return redirect('purchase_items_list')
 
 
+@require_http_methods(["POST"])
+def edit_purchase_item(request, item_id):
+    resp = _require_login(request)
+    if resp:
+        return JsonResponse({'success': False}, status=401)
+
+    item = get_object_or_404(PurchaseItem, id=item_id)
+
+    try:
+        data = json.loads(request.body)
+        item.name = data.get('name', item.name).strip()
+        item.purchase_barcode = data.get('purchase_barcode', item.purchase_barcode or '').strip()
+        item.purchase_price = data.get('purchase_price', item.purchase_price)
+        image_url = data.get('image_url', item.image_url)
+        item.image_url = image_url.strip() if image_url else None
+        item.save()
+        return JsonResponse({
+            'success': True,
+            'name': item.name,
+            'purchase_barcode': item.purchase_barcode,
+            'purchase_price': str(item.purchase_price),
+            'image_url': item.image_url or '',
+        })
+    except Exception as e:
+        logger.error(f"edit_purchase_item hata: {e}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # LISTING COMPONENTS
 # ─────────────────────────────────────────────────────────────────────────────
