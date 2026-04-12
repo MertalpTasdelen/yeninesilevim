@@ -182,75 +182,56 @@ def send_telegram_notification(message: str) -> bool:
 
 def send_low_quantity_purchase_items_telegram_alert(items: List[PurchaseItem]) -> bool:
     """
-    Send low quantity alert for purchase items to Telegram (excluding archived).
-    Messages are split if they exceed Telegram's character limit.
-    
+    Send a compact summary alert for low quantity purchase items to Telegram.
+    Only counts per category are shown; detail commands are included for drill-down.
+
     Args:
         items: List of low quantity purchase items (should already be filtered for is_archived=False)
-        
+
     Returns:
-        True if at least one message sent successfully, False otherwise
+        True if message sent successfully, False otherwise
     """
     if not items:
         return False
-    
+
     # Group items by urgency
     critical = [i for i in items if i.quantity == 0]
     urgent = [i for i in items if 0 < i.quantity <= 1]
     warning = [i for i in items if 1 < i.quantity <= 3]
-    
-    messages = []
-    current_message = f"🛒 <b>Ürün Miktar Uyarısı</b> 🛒\n\n📦 <b>{len(items)} ürün</b> düşük miktarda\n\n"
-    
-    def add_items_section(title, emoji, item_list):
-        nonlocal current_message, messages
-        
-        if not item_list:
-            return
-        
-        section = f"{emoji} <b>{title}</b> ({len(item_list)} ürün):\n"
-        
-        for item in item_list:
-            # Escape HTML special characters
-            name = str(item.name).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            barcode = item.purchase_barcode or 'N/A'
-            
-            line = f"└ {name}\n   Barkod: <code>{barcode}</code> | Miktar: <b>{item.quantity}</b>\n"
-            
-            if item.quantity > 0 and hasattr(item, 'purchase_price') and item.purchase_price:
-                line += f"   Alış: {item.purchase_price} ₺\n"
-            
-            line += "\n"
-            
-            # Check if adding this line would exceed limit (leave 200 char buffer)
-            if len(current_message) + len(section) + len(line) > 3900:
-                messages.append(current_message)
-                current_message = f"🛒 <b>Ürün Miktar Uyarısı (devam)</b> 🛒\n\n{section}"
-            
-            if section not in current_message:
-                current_message += section
-                section = ""
-            
-            current_message += line
-    
-    # Add items by priority
-    add_items_section("TÜKENDİ", "🔴", critical)
-    add_items_section("ACİL", "⚠️", urgent)
-    add_items_section("DÜŞÜK", "📦", warning)
-    
-    # Add timestamp
+
     timestamp = timezone.now().strftime('%d.%m.%Y %H:%M')
-    current_message += f"\n⏰ {timestamp}"
-    messages.append(current_message)
-    
-    # Send all messages
-    success = False
-    for i, msg in enumerate(messages, 1):
-        logger.info(f"Sending Telegram purchase items message {i}/{len(messages)} (length: {len(msg)})")
-        if send_telegram_notification(msg):
-            success = True
-        else:
-            logger.error(f"Failed to send purchase items message {i}/{len(messages)}")
-    
+
+    lines = [
+        "🛒 <b>Ürün Miktar Özeti</b>",
+        f"⏰ {timestamp}",
+        "",
+        f"📊 Toplam <b>{len(items)}</b> ürün dikkat gerektiriyor:",
+        "",
+    ]
+
+    if critical:
+        lines.append(f"🔴 <b>Tükendi</b>: {len(critical)} ürün")
+    if urgent:
+        lines.append(f"⚠️ <b>Acil</b> (1 adet): {len(urgent)} ürün")
+    if warning:
+        lines.append(f"📦 <b>Düşük</b> (2-3 adet): {len(warning)} ürün")
+
+    lines += [
+        "",
+        "💬 Detay için komut gönderin:",
+    ]
+    if critical:
+        lines.append("/tukenen_urunler — Tükenenleri listele")
+    if urgent:
+        lines.append("/acil_urunler — Acil olanları listele")
+    if warning:
+        lines.append("/dusuk_urunler — Düşük miktarlıları listele")
+
+    message = "\n".join(lines)
+
+    logger.info(f"Sending Telegram purchase items summary (length: {len(message)})")
+    success = send_telegram_notification(message)
+    if not success:
+        logger.error("Failed to send Telegram purchase items summary")
     return success
 

@@ -111,6 +111,40 @@ def fetch_cargo_invoice_items(
     return response.json()
 
 
+def fetch_order_by_number(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    order_number: str,
+    start_date_ms: Optional[int] = None,
+    end_date_ms: Optional[int] = None,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    orders_base_url: str = "https://apigw.trendyol.com/integration/order/sellers",
+) -> Dict[str, Any]:
+    """
+    Fetches a shipment package by orderNumber.
+    Orders API only supports the last ~1 month; pass start_date_ms/end_date_ms
+    (millisecond timestamps) so older orders can be found.
+    """
+    url = f"{orders_base_url}/{seller_id}/orders"
+    params: Dict[str, Any] = {"orderNumber": order_number}
+    if start_date_ms is not None:
+        params["startDate"] = start_date_ms
+    if end_date_ms is not None:
+        params["endDate"] = end_date_ms
+    headers = {
+        "User-Agent": user_agent or f"{seller_id}-SelfIntegration",
+        "storeFrontCode": store_front_code,
+        "Content-Type": "application/json",
+    }
+    auth = HTTPBasicAuth(api_key, api_secret)
+    response = requests.get(url, params=params, headers=headers, auth=auth, timeout=30)
+    response.raise_for_status()
+    return response.json()
+
+
 def create_15day_periods(
     start_date: datetime.datetime,
     end_date: datetime.datetime,
@@ -585,10 +619,10 @@ def build_cargo_cost_by_order(
     3. Fetching cargo-invoice items for each invoice serial
 
     Kargo faturaları sipariş tarihinden 2-3 ay sonra kesilebilir;
-    bu yüzden arama penceresi start_date-7 / end_date+60 olarak genişletilir.
+    bu yüzden arama penceresi start_date-7 / end_date+120 olarak genişletilir.
     """
     cargo_start = start_date - datetime.timedelta(days=7)
-    cargo_end = end_date + datetime.timedelta(days=60)
+    cargo_end = end_date + datetime.timedelta(days=120)
     logger.info(
         f"build_cargo_cost_by_order arama penceresi: "
         f"{cargo_start.date()} - {cargo_end.date()}"
@@ -611,7 +645,7 @@ def build_cargo_cost_by_order(
             base_url=base_url,
         )
         for record in deductions:
-            if record.get("transactionType") in ["Kargo Faturası", "Kargo Fatura"]:
+            if "kargo fatura" in (record.get("transactionType") or "").lower():
                 invoice_id = str(record.get("id", ""))
                 if invoice_id and invoice_id not in seen_serials:
                     serials.append(invoice_id)
@@ -657,6 +691,193 @@ def build_cargo_cost_by_order(
 
     logger.info(f"build_cargo_cost_by_order: {len(cargo_by_order)} sipariş için kargo maliyeti hesaplandı")
     return cargo_by_order
+
+
+def get_cargo_cost_for_order(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    order_number: str,
+    reference_date: datetime.datetime,
+    scan_window_days: int = 90,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> Optional[float]:
+    """
+    Belirli bir sipariş için kargo maliyetini döner.
+
+    Trendyol API akışı (docs):
+      1. Current Account Statement — otherfinancials?transactionType=DeductionInvoices
+         → transactionType='Kargo Fatura' kayıtlarının 'id' alanı = invoiceSerialNumber
+      2. Cargo Invoice Details — cargo-invoice/{invoiceSerialNumber}/items
+         → orderNumber eşleşmesi ile amount (₺) bulunur
+
+    Args:
+        reference_date:   Siparişin settlement/teslim tarihi (arama merkezi).
+        scan_window_days: reference_date'ten kaç gün sonraya kadar taransın.
+                          Kargo faturaları gecikmeli kesilebilir; varsayılan 90 gün.
+
+    Returns:
+        float — kargo tutarı (₺), veya None (bu sipariş için Kargo Faturası bulunamadı).
+
+    NOT: whoPays=None (Trendyol kargo öder) siparişler için Kargo Faturası
+    hiçbir zaman DeductionInvoices'ta görünmez → return None beklenen sonuçtur.
+    """
+    cargo_map = build_cargo_cost_by_order(
+        seller_id=seller_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        start_date=reference_date,
+        end_date=reference_date + datetime.timedelta(days=scan_window_days),
+        store_front_code=store_front_code,
+        user_agent=user_agent,
+        base_url=base_url,
+    )
+    return cargo_map.get(order_number)
+
+
+def fetch_delivered_orders_without_cargo(
+    *,
+    seller_id: str,
+    api_key: str,
+    api_secret: str,
+    legal_days: int = 7,
+    lookback_days: int = 90,
+    min_days: int = 60,
+    store_front_code: str = "TRENDYOLTR",
+    user_agent: Optional[str] = None,
+    base_url: str = "https://apigw.trendyol.com/integration/finance/che/sellers",
+) -> List[Dict[str, Any]]:
+    """
+    DELIVERED veya RETURNED olmuş siparişler arasında kargo faturası
+    henüz kesilmemiş olanları döner.
+
+    Yasal süre (VUK md.231/5): teslimden itibaren 7 gün.
+    Yalnızca yasal süreyi aşmış siparişler raporlanır.
+
+    min_days: Settlement'tan bu kadar gün geçmemiş siparişler raporlanmaz.
+              Trendyol'un kargo ödediği durumlarda fatura HIÇ kesilmez;
+              min_days ile bu siparişleri false-positive olarak raporlamaktan
+              kaçınılır. Varsayılan: 60 gün.
+
+    Döner: List[dict] — her eleman:
+        {
+            order_number: str,
+            barcode: str,
+            seller_revenue: float,
+            transaction_date: datetime,
+            transaction_type: str,
+            days_since_delivery: int,
+            days_overdue: int,
+        }
+    """
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
+    # Fatura kesilebilmesi için yasal süre dolmuş olmalı
+    cutoff_date = now - datetime.timedelta(days=legal_days)
+    # En fazla lookback_days geriye bak
+    lookback_start = now - datetime.timedelta(days=lookback_days)
+
+    logger.info(
+        f"fetch_delivered_orders_without_cargo: "
+        f"{lookback_start.date()} → {cutoff_date.date()} "
+        f"(yasal süre={legal_days} gün, lookback={lookback_days} gün, min_days={min_days} gün)"
+    )
+
+    # 1. Bu aralıktaki tüm Sale + Return settlement'larını çek
+    periods = _split_into_15day_periods(lookback_start, cutoff_date)
+    all_settlements: List[Dict[str, Any]] = []
+
+    for period_start, period_end in periods:
+        start_ts = int(period_start.timestamp() * 1000)
+        end_ts = int(period_end.timestamp() * 1000)
+        chunk = fetch_settlements_all_pages(
+            seller_id=seller_id,
+            api_key=api_key,
+            api_secret=api_secret,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            transaction_types=["Sale", "Return"],
+            store_front_code=store_front_code,
+            user_agent=user_agent,
+            base_url=base_url,
+        )
+        all_settlements.extend(chunk)
+
+    logger.info(f"  {len(all_settlements)} settlement kaydı toplandı")
+
+    # 2. Benzersiz sipariş numaralarını + ilk göründükleri tarihi takip et
+    # (aynı sipariş birden fazla satırda çıkabilir — birden fazla ürün)
+    order_map: Dict[str, Dict[str, Any]] = {}
+    for s in all_settlements:
+        order_num = str(s.get("orderNumber", ""))
+        if not order_num:
+            continue
+        tx_ms = s.get("transactionDate")
+        tx_dt = convert_timestamp_to_datetime(tx_ms) if tx_ms else None
+        if not tx_dt:
+            continue
+
+        if order_num not in order_map:
+            order_map[order_num] = {
+                "order_number": order_num,
+                "barcode": s.get("barcode", ""),
+                "seller_revenue": 0.0,
+                "transaction_date": tx_dt,
+                "transaction_type": s.get("transactionType", ""),
+            }
+        order_map[order_num]["seller_revenue"] += float(s.get("sellerRevenue") or 0)
+
+    logger.info(f"  {len(order_map)} benzersiz sipariş bulundu")
+
+    if not order_map:
+        return []
+
+    # 3. Bu siparişler için kargo fatura sorgusunu yap
+    # Pencere: lookback_start - 7 gün / cutoff_date (build_cargo_cost_by_order +120 gün ekler)
+    cargo_by_order = build_cargo_cost_by_order(
+        seller_id=seller_id,
+        api_key=api_key,
+        api_secret=api_secret,
+        start_date=lookback_start - datetime.timedelta(days=7),
+        end_date=cutoff_date,
+        store_front_code=store_front_code,
+        user_agent=user_agent,
+        base_url=base_url,
+    )
+
+    logger.info(f"  {len(cargo_by_order)} sipariş için kargo faturası bulundu")
+
+    # 4. Kargo faturası gelmeyen siparişleri filtrele
+    missing: List[Dict[str, Any]] = []
+    for order_num, info in order_map.items():
+        if order_num not in cargo_by_order:
+            tx_dt = info["transaction_date"]
+            days_since = (now - tx_dt).days
+            days_overdue = days_since - legal_days
+            # min_days'den daha yeni settlement'ları atla —
+            # Trendyol kargo ödüyorsa fatura HİÇ kesilmez, false-positive olur
+            if days_since < min_days:
+                logger.debug(
+                    f"  {order_num} atlandı: {days_since} gün önce settle edildi "
+                    f"(min_days={min_days})"
+                )
+                continue
+            missing.append({
+                "order_number": order_num,
+                "barcode": info["barcode"],
+                "seller_revenue": round(info["seller_revenue"], 2),
+                "transaction_date": tx_dt,
+                "transaction_type": info["transaction_type"],
+                "days_since_delivery": days_since,
+                "days_overdue": days_overdue,
+            })
+
+    # En uzun süredir bekleyenler en üstte
+    missing.sort(key=lambda x: x["days_overdue"], reverse=True)
+    logger.info(f"  Kargo faturası eksik sipariş sayısı: {len(missing)}")
+    return missing
 
 
 def calculate_monthly_summary(

@@ -486,12 +486,32 @@ def listing_components(request):
     if resp:
         return resp
 
+    product_query = request.GET.get('q', '')
+    product_id = request.GET.get('product_id')
+
     products = Product.objects.prefetch_related('components__purchase_item').order_by('name')
+    if product_query:
+        products = products.filter(name__icontains=product_query) | products.filter(barcode__icontains=product_query)
+
+    selected_product = None
+    components = []
+    form = ListingComponentForm()
+
+    if product_id:
+        selected_product = get_object_or_404(Product, id=product_id)
+        components = ListingComponent.objects.filter(
+            inventory_product=selected_product
+        ).select_related('purchase_item')
+
     all_purchase_items = PurchaseItem.objects.filter(is_archived=False).order_by('name')
 
     return render(request, 'inventory/listing_components.html', {
         'products': products,
         'all_purchase_items': all_purchase_items,
+        'selected_product': selected_product,
+        'components': components,
+        'form': form,
+        'product_query': product_query,
     })
 
 
@@ -772,11 +792,14 @@ def trendyol_order_webhook(request):
                 logger.warning(f"⚠️ Barcode bulunamadı: {line}")
                 continue
             
-            # ═══ SADECE APPROVED OLANLARI İŞLE ═══
-            should_process = line_item_status == "Approved"
+            # ═══ İŞLENECEK STATÜLER ═══
+            # Approved: Seller manuel onayladı
+            # ReadyToShip: Trendyol otomatik onayladı, kargoya hazır
+            PROCESSABLE_STATUSES = {"Approved", "ReadyToShip"}
+            should_process = line_item_status in PROCESSABLE_STATUSES
             
             if not should_process:
-                logger.info(f"⏭️ Atlandı: {barcode} - Status: {line_item_status} (Sadece 'Approved' işlenir)")
+                logger.info(f"⏭️ Atlandı: {barcode} - Status: {line_item_status}")
                 # Log kaydet ama stok düşürme
                 TrendyolWebhookLog.objects.create(
                     order_number=order_number,
@@ -786,7 +809,7 @@ def trendyol_order_webhook(request):
                     quantity=quantity,
                     success=False,
                     processed=False,
-                    error_message=f"Atlandı: orderLineItemStatusName '{line_item_status}' (Sadece 'Approved' işlenir)",
+                    error_message=f"Atlandı: orderLineItemStatusName '{line_item_status}' işlenmiyor",
                     raw_payload=payload
                 )
                 results.append({
